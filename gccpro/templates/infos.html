@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Infos{% endblock %}
+{% block content %}
+<h1>Informations de l’immeuble</h1>
+
+{% if upcoming %}
+  {% set next = upcoming[0] %}
+  <section class="card highlight">
+    <p class="eyebrow">Prochain rendez-vous</p>
+    <h2>{{ next.title }}</h2>
+    <p class="big">{{ next.event_date | iso_longue }}</p>
+    {% if next.body %}<p class="body">{{ next.body }}</p>{% endif %}
+  </section>
+  {% for a in upcoming[1:] %}
+  <section class="card">
+    <h2>{{ a.title }}</h2>
+    <p><strong>{{ a.event_date | iso_longue }}</strong></p>
+    {% if a.body %}<p class="body">{{ a.body }}</p>{% endif %}
+  </section>
+  {% endfor %}
+{% endif %}
+
+{% for a in others %}
+<section class="card">
+  <h2>{{ a.title }}</h2>
+  {% if a.event_date %}<p class="muted">{{ a.event_date | iso_longue }}</p>{% endif %}
+  {% if a.body %}<p class="body">{{ a.body }}</p>{% endif %}
+</section>
+{% endfor %}
+
+{% if not upcoming and not others %}
+<p class="muted">Aucune information pour le moment.</p>
+{% endif %}
+{% endblock %}

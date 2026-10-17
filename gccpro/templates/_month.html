@@ -1,0 +1,87 @@
+{#- Month grid shared by "Calendrier" and "Mes semaines".
+    Each row is one Monday–Sunday week; tapping it selects the week (?semaine=)
+    and shows its details and actions in the panel below the grid. -#}
+
+{% macro month_grid(cal, today) %}
+<section class="month" aria-label="Calendrier de {{ cal.label }}">
+  <div class="month-nav">
+    <a class="nav-btn" href="{{ url_for(request.endpoint, mois=cal.prev) }}" aria-label="Mois précédent">‹</a>
+    <h2>{{ cal.label | capitalize }}</h2>
+    <a class="nav-btn" href="{{ url_for(request.endpoint, mois=cal.next) }}" aria-label="Mois suivant">›</a>
+  </div>
+  <div class="dow" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+  {% for w in cal.weeks %}
+  {%- set status = 'past' if w.past else ('mine' if w.mine else ('taken' if w.booking else 'free')) -%}
+  {%- set pickup_days = w.pickups | map(attribute='date') | list -%}
+  <a class="mweek {{ status }}{% if cal.selected and cal.selected.monday == w.monday %} selected{% endif %}{% if w.current %} current{% endif %}"
+     href="{{ url_for(request.endpoint, mois=cal.month, semaine=w.monday.isoformat()) }}#semaine-choisie"
+     aria-label="Semaine {{ w.monday | semaine }}">
+    <span class="days">
+      {%- for d in w.days %}
+      <span class="day{% if d.month != cal.year_month[1] %} out{% endif %}{% if d == today %} today{% endif %}">
+        <span class="num">{{ d.day }}</span>
+        <span class="marks">{% if d in pickup_days %}🗑️{% endif %}{% if d in w.events %}📅{% endif %}</span>
+      </span>
+      {%- endfor %}
+    </span>
+    <span class="owner">
+      {%- if w.mine %}Vous
+      {%- elif w.booking %}{{ w.booking.name }}
+      {%- elif w.past %}—
+      {%- else %}Libre{% endif -%}
+    </span>
+  </a>
+  {% endfor %}
+  <p class="legend muted small">🗑️ collecte (sortir la veille au soir) · 📅 événement · touchez une semaine pour la réserver</p>
+</section>
+{% endmacro %}
+
+{% macro week_panel(w) %}
+<section class="card week-panel" id="semaine-choisie">
+  <h2>Semaine {{ w.monday | semaine }}</h2>
+  <p>
+    {% if w.mine %}<strong>Vous êtes inscrit(e) cette semaine.</strong>
+    {% elif w.booking %}Inscrit : <strong>{{ w.booking.name }}</strong>{% if w.booking.apartment %} ({{ w.booking.apartment }}){% endif %}
+    {% elif w.past %}<span class="muted">Semaine passée, personne n’était inscrit.</span>
+    {% else %}<span class="badge">Libre</span>{% endif %}
+  </p>
+  {% if w.pickups %}
+  <ul class="pickups">
+    {% for p in w.pickups %}<li>🗑️ {{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% for day, titles in w.events.items() %}
+    {% for t in titles %}<p>📅 {{ day | date_courte }} : {{ t }} <a href="{{ url_for('info.index') }}">détails</a></p>{% endfor %}
+  {% endfor %}
+  <div class="actions">
+    {% if w.can_book_1 %}
+    <form method="post" action="{{ url_for('calendar.book') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+      <input type="hidden" name="count" value="1">
+      <button>Réserver cette semaine</button>
+    </form>
+    {% endif %}
+    {% if w.can_book_2 %}
+    <form method="post" action="{{ url_for('calendar.book') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+      <input type="hidden" name="count" value="2">
+      <button class="secondary">Réserver 2 semaines</button>
+    </form>
+    {% endif %}
+    {% if w.can_cancel %}
+    <form method="post" action="{{ url_for('account.cancel') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+      <button class="danger">Annuler ma semaine</button>
+    </form>
+    {% elif w.mine and not w.past %}
+    <p class="muted small">Annulation impossible depuis le {{ w.cancel_deadline | date_courte }}. Contactez l’administrateur.</p>
+    {% endif %}
+    {% if not w.booking and not w.past and not w.can_book_1 %}
+    <p class="muted small">Cette semaine ne peut pas être réservée (plus de 2 semaines d’affilée, ou au-delà de la période ouverte).</p>
+    {% endif %}
+  </div>
+</section>
+{% endmacro %}

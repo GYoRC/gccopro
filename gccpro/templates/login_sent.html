@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Lien envoyé{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Vérifiez votre messagerie</h1>
+  <p>Si <strong>{{ email }}</strong> est enregistrée, un lien de connexion vient d’y être envoyé.
+     Il est valable 15 minutes.</p>
+  <p class="muted">Rien reçu ? Regardez dans les courriers indésirables, ou demandez à l’administrateur
+     de vérifier votre adresse.</p>
+  <p><a href="{{ url_for('account.login') }}">Recommencer</a></p>
+</section>
+{% endblock %}

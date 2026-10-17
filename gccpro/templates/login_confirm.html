@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Connexion</h1>
+  <p>Appuyez sur le bouton pour vous connecter sur cet appareil.</p>
+  <form method="post" action="{{ url_for('account.login_finish', token=token) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button>Se connecter</button>
+  </form>
+</section>
+{% endblock %}

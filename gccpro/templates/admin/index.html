@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% macro csrf(anchor) %}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="anchor" value="#{{ anchor }}">
+{% endmacro %}
+{% block content %}
+<h1>Administration</h1>
+<nav class="tabs">
+  <a href="#residents">Résidents</a> <a href="#semaines">Semaines</a> <a href="#poubelles">Poubelles</a>
+  <a href="#annonces">Annonces</a> <a href="#reglages">Réglages</a>
+</nav>
+
+<section class="card" id="residents">
+  <h2>Résidents</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Nom</th><th>Logement</th><th>E-mail</th><th>Rôle</th><th></th></tr></thead>
+    <tbody>
+    {% for r in residents %}
+      <tr class="{% if not r.active %}inactive{% endif %}">
+        <td>{{ r.name }}</td><td>{{ r.apartment }}</td><td>{{ r.email }}</td>
+        <td>{{ 'Admin' if r.role == 'admin' else 'Résident' }}{% if not r.active %} · désactivé{% endif %}</td>
+        <td class="buttons">
+          {% if r.active %}
+          <form method="post" action="{{ url_for('admin.send_link', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">Envoyer un lien</button></form>
+          {% endif %}
+          {% if r.id != current_user.id %}
+          <form method="post" action="{{ url_for('admin.toggle_role', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">{{ 'Retirer admin' if r.role == 'admin' else 'Rendre admin' }}</button></form>
+          <form method="post" action="{{ url_for('admin.toggle_active', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small {{ 'danger' if r.active else 'secondary' }}">{{ 'Désactiver' if r.active else 'Réactiver' }}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <h3>Ajouter un résident</h3>
+  <form method="post" action="{{ url_for('admin.add_resident') }}" class="grid">
+    {{ csrf('residents') }}
+    <label>Nom <input name="name" required></label>
+    <label>Logement <input name="apartment" placeholder="ex. Apt 3"></label>
+    <label>E-mail <input type="email" name="email" required></label>
+    <label class="check"><input type="checkbox" name="send_link" value="1" checked> Envoyer un lien de connexion</label>
+    <label class="check"><input type="checkbox" name="is_admin" value="1"> Administrateur</label>
+    <button>Ajouter</button>
+  </form>
+</section>
+
+<section class="card" id="semaines">
+  <h2>Semaines</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Semaine</th><th>Inscrit</th><th>Attribuer</th></tr></thead>
+    <tbody>
+    {% for w in weeks %}
+      <tr class="{% if not w.booking %}free{% endif %}">
+        <td>{{ w.monday | semaine }}</td>
+        <td>{% if w.booking %}{{ w.booking.name }}{% if w.booking.assigned_by_admin %} <span class="muted">(attribuée)</span>{% endif %}{% else %}<span class="badge">Libre</span>{% endif %}</td>
+        <td class="buttons">
+          <form method="post" action="{{ url_for('admin.assign_week') }}" class="inline-form">
+            {{ csrf('semaines') }}
+            <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+            <select name="resident_id" aria-label="Résident">
+              <option value="">—</option>
+              {% for r in residents if r.active %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
+            </select>
+            <button class="small">OK</button>
+          </form>
+          {% if w.booking %}
+          <form method="post" action="{{ url_for('admin.free_week') }}">
+            {{ csrf('semaines') }}
+            <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+            <button class="small danger">Libérer</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card" id="poubelles">
+  <h2>Collectes des poubelles</h2>
+  {% if trash_rules %}
+  <ul class="plain">
+    {% for t in trash_rules %}
+    <li class="row">
+      <span><strong>{{ t.label }}</strong> — {{ jours[t.weekday] }}, {{ frequencies[t.frequency] | lower }}</span>
+      <form method="post" action="{{ url_for('admin.delete_trash_rule', rule_id=t.id) }}">{{ csrf('poubelles') }}<button class="small danger">Supprimer</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Aucune collecte définie : aucun rappel ne sera envoyé.</p>
+  {% endif %}
+  <h3>Ajouter une collecte</h3>
+  <form method="post" action="{{ url_for('admin.add_trash_rule') }}" class="grid">
+    {{ csrf('poubelles') }}
+    <label>Type <input name="label" required placeholder="ex. Ordures ménagères"></label>
+    <label>Jour de collecte
+      <select name="weekday">{% for j in jours %}<option value="{{ loop.index0 }}">{{ j }}</option>{% endfor %}</select>
+    </label>
+    <label>Fréquence
+      <select name="frequency">{% for key, label in frequencies.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+    </label>
+    <button>Ajouter</button>
+  </form>
+
+  <h3>Exceptions (jours fériés…)</h3>
+  {% if exceptions %}
+  <ul class="plain">
+    {% for e in exceptions %}
+    <li class="row">
+      <span>{{ e.label }} du {{ e.date | iso_longue }} :
+        {% if e.moved_to %}déplacée au {{ e.moved_to | iso_longue }}{% else %}annulée{% endif %}</span>
+      <form method="post" action="{{ url_for('admin.delete_exception', exception_id=e.id) }}">{{ csrf('poubelles') }}<button class="small danger">Supprimer</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if trash_rules %}
+  <form method="post" action="{{ url_for('admin.add_exception') }}" class="grid">
+    {{ csrf('poubelles') }}
+    <label>Collecte
+      <select name="rule_id">{% for t in trash_rules %}<option value="{{ t.id }}">{{ t.label }} ({{ jours[t.weekday] }})</option>{% endfor %}</select>
+    </label>
+    <label>Date habituelle <input type="date" name="date" required></label>
+    <label>Nouvelle date <input type="date" name="moved_to"> <span class="muted small">vide = annulée</span></label>
+    <button>Enregistrer</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card" id="annonces">
+  <h2>Annonces</h2>
+  <form method="post" action="{{ url_for('admin.add_announcement') }}" class="grid">
+    {{ csrf('annonces') }}
+    <label>Titre <input name="title" required placeholder="ex. Assemblée Générale"></label>
+    <label>Date de l’événement <input type="date" name="event_date"> <span class="muted small">facultatif</span></label>
+    <label class="wide">Texte <textarea name="body" rows="4" placeholder="Heure, lieu, ordre du jour…"></textarea></label>
+    <label class="check"><input type="checkbox" name="notify" value="1"> Notifier les résidents</label>
+    <button>Publier</button>
+  </form>
+  {% if announcements %}
+  <ul class="plain">
+    {% for a in announcements %}
+    <li class="row">
+      <span><strong>{{ a.title }}</strong>{% if a.event_date %} — {{ a.event_date | iso_longue }}{% endif %}</span>
+      <form method="post" action="{{ url_for('admin.delete_announcement', announcement_id=a.id) }}">{{ csrf('annonces') }}<button class="small danger">Supprimer</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="card" id="reglages">
+  <h2>Réglages</h2>
+  <form method="post" action="{{ url_for('admin.save_settings') }}" class="grid">
+    {{ csrf('reglages') }}
+    {% for name, field in setting_fields.items() %}
+    <label>{{ field[2] }} <input type="number" name="{{ name }}" min="{{ field[0] }}" max="{{ field[1] }}" value="{{ settings[name] }}" required></label>
+    {% endfor %}
+    <button>Enregistrer</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.test_notification') }}">
+    {{ csrf('reglages') }}
+    <button class="secondary">M’envoyer une notification de test</button>
+  </form>
+</section>
+{% endblock %}

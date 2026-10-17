@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Connexion</h1>
+  <p>Saisissez votre adresse e-mail : vous recevrez un lien pour vous connecter, sans mot de passe.</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Adresse e-mail
+      <input type="email" name="email" required autocomplete="email" autofocus>
+    </label>
+    <button>Recevoir mon lien</button>
+  </form>
+</section>
+{% endblock %}

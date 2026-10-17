@@ -6,9 +6,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - All code, comments, docs, commit messages and this file: English only.
 - The user may chat in French or English; reply in the user's language in chat.
 
+## What this is
+Chores rota for a building in France: residents book whole weeks (Monday–Sunday, 1 or 2 consecutive, max 2 in a row) to clean common areas, take out the trash and clean the parking lot; the person on duty gets a push notification the evening before each trash pickup. Also shows building info (e.g. Assemblée Générale date). **All user-facing text is French**; code, comments and logs are English.
+
 ## Stack
-- Backend: Python + SQLite, runs on the NAS.
-- Frontend: Node.js is a build tool on the dev machine only; the NAS serves the built static output.
+- Python 3.12, Flask + Jinja2 server-rendered pages, Waitress, SQLite (stdlib `sqlite3`). Plain JS in `gccpro/static/` only for the service worker and push button; no Node, no build step.
+- Every runtime dependency must be pure Python (see NAS constraints below). `cryptography` is dev-only, used to cross-check `gccpro/aesgcm.py`.
+
+## Commands (PC, Git Bash, from repo root)
+- Setup: `py -3.12 -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt`
+- Tests: `.venv/Scripts/python -m pytest` — single test: `.venv/Scripts/python -m pytest tests/test_rules.py::test_horizon`
+- Dev server: `.venv/Scripts/flask --app gccpro run --debug`, open `http://localhost:5000` (DB in `instance/`, emails printed to console, so log in by copying the link from the terminal). Optional git-ignored `instance/config.toml` is loaded automatically (holds the dev VAPID key so push works on localhost). First create an admin: `.venv/Scripts/flask --app gccpro create-admin --name X --email Y`
+- Other CLI: `send-reminders [--date YYYY-MM-DD] [--dry-run]`, `gen-vapid`, `backup DEST`
+- Deploy: `bash deploy/deploy.sh` (tar over `ssh nas`, then `deploy/install.sh` on the NAS updates the venv and restarts).
+
+## Architecture
+- `gccpro/__init__.py:create_app` is the factory for CLI, tests and Waitress (`--call gccpro:create_app`). Config = defaults in `config.py`, then the TOML file named by `GCCPRO_CONFIG` (keys are Flask config keys), then test overrides.
+- Business logic is pure and unit-tested: `rules.py` (booking validation, cancel deadline, who gets the trash reminder = owner of the week containing the day *before* the pickup), `trash.py` (expands weekly / even / odd ISO-week rules plus cancel/move exceptions into dates), `frdates.py` (French dates, no locale). Views only load data via `db.py` helpers and call these.
+- Schema: `gccpro/schema/NNN_*.sql`, applied automatically at startup by `db.migrate` (add a new numbered file; never edit an applied one). Dates are ISO strings; one booking per week (`bookings.week_start` = Monday, primary key). Avoid `STRICT` tables: the NAS `sqlite3` CLI is 3.34.
+- Auth: one-time email link (`auth.py`); GET on the link only shows a button, POST consumes it (protects against mail scanners). Signed cookie session, 180 days. CSRF token required on every POST (`csrf_token` form field or `X-CSRF-Token` header). Strict CSP: no inline scripts or styles in templates.
+- Push: `push.py` implements RFC 8291 encryption + VAPID with pure-Python `ecdsa` and `aesgcm.py`, because `cryptography` has no wheel for the NAS. Tests check RFC/NIST vectors; keep them passing when touching crypto.
+- `reminders.run` is idempotent via `notification_log`; trash reminders fall back to email when the resident has no push subscription.
+- Time: always `clock.today()` (Europe/Paris, overridable via `TODAY` config in tests), never `date.today()`.
+
+## Production on the NAS
+- Layout: `/volume1/homes/claude/gccpro/{app,venv,data}`; `data/` holds `config.toml` (secrets, chmod 600), `gccpro.db`, `backups/`, `logs/`. Deploys replace only `app/`.
+- Waitress listens on `127.0.0.1:8090` behind the DSM reverse proxy (HTTPS on `NAS.yoanngualtieri.xyz`). DSM Task Scheduler (as user `claude`): `deploy/start.sh` at boot and every 5 min (watchdog), `deploy/reminders.sh` daily 18:00, `deploy/backup.sh` nightly.
+- Logs: `data/logs/{server,reminders,backup}.log`.
 
 ## Hosting constraints (Synology DS216j)
 - NAS address: 192.168.1.49 (DSM web UI on HTTPS port 5001).

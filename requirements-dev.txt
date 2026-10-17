@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest==8.4.2
+# Reference implementation to cross-check gccpro.aesgcm (not installable on the NAS).
+cryptography==46.0.3

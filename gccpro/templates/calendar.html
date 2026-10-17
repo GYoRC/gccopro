@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_month.html" import month_grid, week_panel with context %}
+{% block title %}Calendrier{% endblock %}
+{% block content %}
+<h1>Calendrier d’entretien</h1>
+<p class="intro">Chaque semaine, du lundi au dimanche, la personne inscrite nettoie les parties communes,
+  sort les poubelles et nettoie le parking. Vous pouvez réserver 1 ou 2 semaines d’affilée.</p>
+
+<nav class="switch" aria-label="Affichage">
+  <a href="{{ url_for('calendar.index') }}"{% if view == 'mois' %} aria-current="page"{% endif %}>Mois</a>
+  <a href="{{ url_for('calendar.index', vue='liste') }}"{% if view == 'liste' %} aria-current="page"{% endif %}>Liste</a>
+</nav>
+
+{% if view == 'mois' %}
+  {{ month_grid(cal, today) }}
+  {% if cal.selected %}{{ week_panel(cal.selected) }}{% endif %}
+{% else %}
+<ol class="weeks">
+{% for row in rows %}
+  <li class="week{% if row.mine %} mine{% elif not row.booking %} free{% endif %}{% if row.current %} current{% endif %}">
+    <div class="week-head">
+      <span class="week-dates">{% if row.current %}Cette semaine · {% endif %}{{ row.monday | semaine }}</span>
+      {% if row.booking %}
+        <span class="who">{% if row.mine %}Vous{% else %}{{ row.booking.name }}{% if row.booking.apartment %} ({{ row.booking.apartment }}){% endif %}{% endif %}</span>
+      {% else %}
+        <span class="badge">Libre</span>
+      {% endif %}
+    </div>
+    {% if row.pickups %}
+      <ul class="pickups">
+      {% for p in row.pickups %}<li>🗑️ {{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% if row.can_book_1 or row.can_book_2 %}
+      <div class="actions">
+        {% if row.can_book_1 %}
+        <form method="post" action="{{ url_for('calendar.book') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="week_start" value="{{ row.monday.isoformat() }}">
+          <input type="hidden" name="count" value="1">
+          <button>Réserver cette semaine</button>
+        </form>
+        {% endif %}
+        {% if row.can_book_2 %}
+        <form method="post" action="{{ url_for('calendar.book') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="week_start" value="{{ row.monday.isoformat() }}">
+          <input type="hidden" name="count" value="2">
+          <button class="secondary">Réserver 2 semaines</button>
+        </form>
+        {% endif %}
+      </div>
+    {% endif %}
+  </li>
+{% endfor %}
+</ol>
+{% endif %}
+{% endblock %}

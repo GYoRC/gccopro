@@ -1,0 +1,22 @@
+# GCCopro production config: copy to <base>/data/config.toml on the NAS (chmod 600).
+# Keys are Flask config keys. Never commit the real file.
+
+# Long random string: python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+SECRET_KEY = "change-me"
+
+BASE_URL = "https://NAS.yoanngualtieri.xyz"
+DATABASE = "/var/services/homes/claude/gccpro/data/gccpro.db"
+SESSION_COOKIE_SECURE = true
+
+# "smtp" to send real emails; "console" writes them to data/logs/server.log instead.
+MAIL_BACKEND = "smtp"
+MAIL_FROM = "GCCopro <copro@yoanngualtieri.xyz>"
+SMTP_HOST = "smtp.example.org"
+SMTP_PORT = 465          # 465 = implicit TLS; use 587 with SMTP_STARTTLS = true
+SMTP_STARTTLS = false
+SMTP_USER = "copro@yoanngualtieri.xyz"
+SMTP_PASSWORD = "change-me"
+
+# flask --app gccpro gen-vapid ; changing it later invalidates all push subscriptions.
+VAPID_PRIVATE_KEY = "change-me"
+VAPID_SUBJECT = "mailto:copro@yoanngualtieri.xyz"
