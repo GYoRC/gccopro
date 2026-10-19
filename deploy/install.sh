@@ -21,11 +21,15 @@ chmod 600 "$GCCPRO_CONFIG"
 
 "$APP/deploy/stop.sh"
 "$APP/deploy/start.sh"
-sleep 3
-if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/connexion"; then
-  echo "GCCopro is running on 127.0.0.1:$PORT"
-else
-  echo "GCCopro did not answer; see $LOGS/server.log" >&2
-  tail -20 "$LOGS/server.log" >&2
-  exit 1
-fi
+
+# Startup takes several seconds on the NAS's ARM CPU; wait up to 30 s.
+for _ in $(seq 1 15); do
+  sleep 2
+  if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/connexion" 2>/dev/null; then
+    echo "GCCopro is running on 127.0.0.1:$PORT"
+    exit 0
+  fi
+done
+echo "GCCopro did not answer within 30 s; see $LOGS/server.log" >&2
+tail -20 "$LOGS/server.log" >&2
+exit 1

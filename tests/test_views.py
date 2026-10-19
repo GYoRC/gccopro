@@ -201,6 +201,16 @@ def test_back_redirect_ignores_other_sites(client, outbox):
     assert response.headers["Location"] == "/"
 
 
+def test_login_link_command(app, client):
+    result = app.test_cli_runner().invoke(args=["login-link", "alice@test.fr"])
+    assert result.exit_code == 0
+    link = re.search(r"https://copro\.test(/connexion/\S+)", result.output).group(1)
+    client.post(link, data={"csrf_token": csrf(client)})
+    assert client.get("/").status_code == 200
+    result = app.test_cli_runner().invoke(args=["login-link", "nobody@test.fr"])
+    assert result.exit_code != 0
+
+
 def test_manifest_and_service_worker(client):
     assert client.get("/manifest.webmanifest").json["lang"] == "fr"
     assert "showNotification" in client.get("/sw.js").get_data(as_text=True)

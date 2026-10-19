@@ -4,13 +4,15 @@ import sqlite3
 from datetime import date
 
 import click
-from flask import Flask
+from flask import Flask, current_app
+from flask.cli import with_appcontext
 
-from . import clock, push, reminders
+from . import auth, clock, push, reminders
 from .db import get_db
 
 
 @click.command("create-admin")
+@with_appcontext
 @click.option("--name", required=True, help="Display name, e.g. 'Yoann G.'")
 @click.option("--email", required=True)
 @click.option("--apartment", default="", help="Apartment label, e.g. 'Apt 3'")
@@ -26,7 +28,24 @@ def create_admin(name: str, email: str, apartment: str) -> None:
     click.echo(f"Administrator {email} ready. Log in with this address at /connexion.")
 
 
+@click.command("login-link")
+@with_appcontext
+@click.argument("email")
+def login_link(email: str) -> None:
+    """Print a one-time login link for EMAIL (works without any email setup)."""
+    resident = get_db().execute(
+        "SELECT * FROM residents WHERE email = ? AND active = 1", (email.strip(),)
+    ).fetchone()
+    if resident is None:
+        raise click.ClickException(f"No active resident with email {email}.")
+    token = auth.create_login_token(resident["id"])
+    base = current_app.config["BASE_URL"].rstrip("/")
+    click.echo(f"{base}/connexion/{token}")
+    click.echo(f"Valid {int(auth.TOKEN_LIFETIME.total_seconds() // 60)} minutes, single use.")
+
+
 @click.command("gen-vapid")
+@with_appcontext
 def gen_vapid() -> None:
     """Print a new VAPID private key line for the config file."""
     key = push.generate_vapid_private_key()
@@ -35,6 +54,7 @@ def gen_vapid() -> None:
 
 
 @click.command("send-reminders")
+@with_appcontext
 @click.option("--date", "on_date", default=None, help="Run as if today were YYYY-MM-DD.")
 @click.option("--dry-run", is_flag=True, help="Show what would be sent, send nothing.")
 def send_reminders(on_date: str | None, dry_run: bool) -> None:
@@ -47,6 +67,7 @@ def send_reminders(on_date: str | None, dry_run: bool) -> None:
 
 
 @click.command("backup")
+@with_appcontext
 @click.argument("destination")
 def backup(destination: str) -> None:
     """Write a consistent copy of the database to DESTINATION (safe while running)."""
@@ -60,5 +81,5 @@ def backup(destination: str) -> None:
 
 def init_app(app: Flask) -> None:
     """Register the commands on ``app``."""
-    for command in (create_admin, gen_vapid, send_reminders, backup):
+    for command in (create_admin, login_link, gen_vapid, send_reminders, backup):
         app.cli.add_command(command)

@@ -17,7 +17,8 @@ Chores rota for a building in France: residents book whole weeks (Monday–Sunda
 - Setup: `py -3.12 -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt`
 - Tests: `.venv/Scripts/python -m pytest` — single test: `.venv/Scripts/python -m pytest tests/test_rules.py::test_horizon`
 - Dev server: `.venv/Scripts/flask --app gccpro run --debug`, open `http://localhost:5000` (DB in `instance/`, emails printed to console, so log in by copying the link from the terminal). Optional git-ignored `instance/config.toml` is loaded automatically (holds the dev VAPID key so push works on localhost). First create an admin: `.venv/Scripts/flask --app gccpro create-admin --name X --email Y`
-- Other CLI: `send-reminders [--date YYYY-MM-DD] [--dry-run]`, `gen-vapid`, `backup DEST`
+- Other CLI: `send-reminders [--date YYYY-MM-DD] [--dry-run]`, `login-link EMAIL` (prints a login link, no email needed), `gen-vapid`, `backup DEST`. Commands need `@with_appcontext`.
+- On the NAS: `ssh nas bash gccpro/app/deploy/login-link.sh EMAIL`; set the SMTP password interactively with `ssh -t nas bash gccpro/app/deploy/set-smtp-password.sh` (never put it on a command line).
 - Deploy: `bash deploy/deploy.sh` (tar over `ssh nas`, then `deploy/install.sh` on the NAS updates the venv and restarts).
 
 ## Architecture
