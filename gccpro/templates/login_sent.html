@@ -1,12 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Lien envoyé{% endblock %}
+{% block title %}Demande envoyée{% endblock %}
 {% block content %}
 <section class="card narrow">
-  <h1>Vérifiez votre messagerie</h1>
-  <p>Si <strong>{{ email }}</strong> est enregistrée, un lien de connexion vient d’y être envoyé.
-     Il est valable 15 minutes.</p>
-  <p class="muted">Rien reçu ? Regardez dans les courriers indésirables, ou demandez à l’administrateur
-     de vérifier votre adresse.</p>
+  {% if kind == 'email' %}
+    <h1>Vérifiez votre messagerie</h1>
+    <p>Si <strong>{{ identifier }}</strong> est enregistrée, un lien de connexion vient d’y être envoyé.
+       Il est valable 15 minutes.</p>
+    <p class="muted">Rien reçu ? Regardez dans les courriers indésirables (et marquez le message
+       « Non spam »), ou demandez à l’administrateur de vérifier votre adresse.</p>
+  {% else %}
+    <h1>Demande transmise</h1>
+    <p>Si le numéro <strong>{{ identifier }}</strong> est enregistré, l’administrateur a été prévenu :
+       il vous enverra un lien de connexion par <strong>WhatsApp</strong>, valable 24 heures.</p>
+    <p class="muted">Pas de réponse ? Contactez-le directement, par exemple sur le groupe WhatsApp de l’immeuble.</p>
+  {% endif %}
   <p><a href="{{ url_for('account.login') }}">Recommencer</a></p>
 </section>
 {% endblock %}

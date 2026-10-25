@@ -6,7 +6,7 @@ the test-suite, and Waitress in production (``waitress-serve --call gccpro:creat
 
 from flask import Flask, render_template
 
-from . import auth, cli, config, db, frdates
+from . import auth, cli, config, db, frdates, phones
 from .views import account, admin, calendar, info, pwa
 
 #: Content-Security-Policy: everything from this origin only, no inline scripts.
@@ -36,6 +36,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.add_template_filter(frdates.date_courte)
     app.add_template_filter(frdates.semaine)
     app.add_template_filter(frdates.iso_longue)
+    app.add_template_filter(phones.display, "telephone")
 
     @app.after_request
     def security_headers(response):

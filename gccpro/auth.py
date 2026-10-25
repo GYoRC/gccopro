@@ -1,20 +1,27 @@
-"""Authentication by one-time email link, session handling and CSRF protection."""
+"""Authentication by one-time link, session handling and CSRF protection.
+
+Links reach residents by email automatically, or, for residents identified by
+phone number, through an admin who forwards them on WhatsApp.
+"""
 
 import functools
 import hashlib
 import hmac
 import secrets
+import sqlite3
 import time
 from collections import defaultdict, deque
 from datetime import timedelta
 
 from flask import Flask, abort, current_app, g, redirect, request, session, url_for
 
-from . import clock, mail
+from . import clock, mail, phones, push
 from .db import get_db
 
-#: How long a login link stays valid.
+#: How long a login link sent by email stays valid.
 TOKEN_LIFETIME = timedelta(minutes=15)
+#: Links sent by an admin on WhatsApp: the admin may only see the request later.
+WHATSAPP_LINK_LIFETIME = timedelta(hours=24)
 
 
 def hash_token(token: str) -> str:
@@ -22,10 +29,10 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
-def create_login_token(resident_id: int) -> str:
+def create_login_token(resident_id: int, lifetime: timedelta = TOKEN_LIFETIME) -> str:
     """Create and store a single-use login token for ``resident_id``; return it."""
     token = secrets.token_urlsafe(32)
-    expires = clock.iso_utc(clock.utcnow() + TOKEN_LIFETIME)
+    expires = clock.iso_utc(clock.utcnow() + lifetime)
     db = get_db()
     with db:
         db.execute(
@@ -57,10 +64,20 @@ def consume_login_token(token: str) -> int | None:
     return row["resident_id"]
 
 
-def send_login_link(resident) -> None:
-    """Email a fresh login link to ``resident`` (a residents row)."""
-    token = create_login_token(resident["id"])
-    link = current_app.config["BASE_URL"].rstrip("/") + url_for("account.login_confirm", token=token)
+def login_url(token: str) -> str:
+    """Return the absolute URL of the login page for ``token``."""
+    return current_app.config["BASE_URL"].rstrip("/") + url_for("account.login_confirm", token=token)
+
+
+def send_login_link(resident: sqlite3.Row) -> bool:
+    """Email a fresh login link to ``resident`` (a residents row).
+
+    Returns:
+        False, without creating a token, when the resident has no email address.
+    """
+    if not resident["email"]:
+        return False
+    link = login_url(create_login_token(resident["id"]))
     mail.send_mail(
         resident["email"],
         f"Votre lien de connexion – {current_app.config['SITE_NAME']}",
@@ -69,6 +86,63 @@ def send_login_link(resident) -> None:
         f"(valable 15 minutes, utilisable une seule fois) :\n\n{link}\n\n"
         "Si vous n’avez pas demandé ce lien, vous pouvez ignorer ce message.\n",
     )
+    return True
+
+
+def whatsapp_link(resident: sqlite3.Row) -> tuple[str, str]:
+    """Create a login link for an admin to send by WhatsApp.
+
+    The link lives :data:`WHATSAPP_LINK_LIFETIME`, since the admin may not send
+    it right away. Pending phone login requests of the resident are marked handled.
+
+    Returns:
+        ``(wa_url, message)``: the wa.me URL opening the chat with the message
+        pre-filled, and the message itself (shown to the admin).
+    """
+    link = login_url(create_login_token(resident["id"], WHATSAPP_LINK_LIFETIME))
+    message = (
+        f"Bonjour {resident['name']}, voici votre lien de connexion à "
+        f"{current_app.config['SITE_NAME']} (valable 24 h, utilisable une seule fois) : {link}"
+    )
+    db = get_db()
+    with db:
+        db.execute(
+            "UPDATE login_requests SET handled_at = ? WHERE resident_id = ? AND handled_at IS NULL",
+            (clock.iso_utc(clock.utcnow()), resident["id"]),
+        )
+    return phones.whatsapp_url(resident["phone"], message), message
+
+
+def request_whatsapp_link(resident: sqlite3.Row) -> None:
+    """Record a phone login request and alert the admins (push, plus email if they have one).
+
+    Repeated requests while one is still pending within the last hour are
+    ignored, so a resident tapping the button several times alerts admins once.
+    """
+    db = get_db()
+    recent = clock.iso_utc(clock.utcnow() - timedelta(hours=1))
+    pending = db.execute(
+        "SELECT 1 FROM login_requests WHERE resident_id = ? AND handled_at IS NULL AND requested_at > ?",
+        (resident["id"], recent),
+    ).fetchone()
+    if pending:
+        return
+    with db:
+        db.execute("INSERT INTO login_requests (resident_id, requested_at) VALUES (?, ?)",
+                   (resident["id"], clock.iso_utc(clock.utcnow())))
+
+    who = resident["name"] + (f" ({resident['apartment']})" if resident["apartment"] else "")
+    text = f"{who} demande un lien de connexion par WhatsApp."
+    admin_url = current_app.config["BASE_URL"].rstrip("/") + url_for("admin.index") + "#connexions"
+    admins = db.execute("SELECT * FROM residents WHERE role = 'admin' AND active = 1").fetchall()
+    for admin in admins:
+        push.send_to_resident(admin["id"], "Demande de connexion", text, "/admin#connexions")
+        if admin["email"]:
+            mail.send_mail(
+                admin["email"],
+                f"Demande de connexion – {current_app.config['SITE_NAME']}",
+                f"{text}\n\nRépondez depuis l’administration (bouton WhatsApp) : {admin_url}\n",
+            )
 
 
 def log_in(resident_id: int) -> None:
@@ -99,13 +173,13 @@ class RateLimiter:
         return True
 
 
-def allow_login_request(email: str, ip: str) -> bool:
-    """Apply the login-link limit: 5 requests per 15 minutes per address and per IP."""
+def allow_login_request(identifier: str, ip: str) -> bool:
+    """Apply the login-link limit: 5 requests per 15 minutes per email/phone and per IP."""
     limiter: RateLimiter = current_app.extensions["login_limiter"]
-    # Both keys are always counted, so a burst on one address still counts for the IP.
+    # Both keys are always counted, so a burst on one identifier still counts for the IP.
     ip_ok = limiter.allow("ip:" + ip)
-    email_ok = limiter.allow("email:" + email.lower())
-    return ip_ok and email_ok
+    id_ok = limiter.allow("id:" + identifier.lower())
+    return ip_ok and id_ok
 
 
 # --- Request hooks and decorators ---------------------------------------------------

@@ -20,6 +20,7 @@ gccpro/                  repo root
 │   ├── rules.py         booking rules (pure)
 │   ├── trash.py         trash pickup expansion (pure)
 │   ├── frdates.py       French date formatting (pure)
+│   ├── phones.py        phone normalisation (E.164), display, wa.me links (pure)
 │   ├── push.py          Web Push: RFC 8291 encryption + VAPID
 │   ├── aesgcm.py        pure-Python AES-GCM used by push.py
 │   ├── reminders.py     daily reminder job

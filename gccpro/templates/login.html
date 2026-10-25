@@ -3,13 +3,17 @@
 {% block content %}
 <section class="card narrow">
   <h1>Connexion</h1>
-  <p>Saisissez votre adresse e-mail : vous recevrez un lien pour vous connecter, sans mot de passe.</p>
+  <p>Saisissez votre adresse e-mail ou votre numéro de téléphone : vous recevrez un lien pour vous
+     connecter, sans mot de passe.</p>
   <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Adresse e-mail
-      <input type="email" name="email" required autocomplete="email" autofocus>
+    <label>E-mail ou numéro de téléphone
+      <input type="text" name="identifiant" required autocomplete="username" autofocus
+             autocapitalize="off" spellcheck="false" value="{{ identifier or '' }}"
+             placeholder="ex. prenom@exemple.fr ou 06 12 34 56 78">
     </label>
     <button>Recevoir mon lien</button>
   </form>
+  <p class="muted small">Avec un numéro de téléphone, l’administrateur vous envoie le lien par WhatsApp.</p>
 </section>
 {% endblock %}

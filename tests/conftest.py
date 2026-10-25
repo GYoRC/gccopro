@@ -64,6 +64,6 @@ def csrf(client) -> str:
 def login(client, outbox, email: str) -> None:
     """Log ``client`` in as ``email`` through the real email-link flow."""
     token = csrf(client)
-    client.post("/connexion", data={"email": email, "csrf_token": token})
+    client.post("/connexion", data={"identifiant": email, "csrf_token": token})
     link = re.search(r"https://copro\.test(/connexion/\S+)", outbox[-1].get_content()).group(1)
     client.post(link, data={"csrf_token": csrf(client)})

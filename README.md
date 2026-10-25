@@ -28,7 +28,7 @@ The interface is entirely in French.
   - announcements;
   - settings;
   - a test notification.
-- **No passwords**: residents log in with a one-time link sent by email, then stay logged in for 6 months.
+- **No passwords**: residents log in with a one-time link, sent by email automatically, or, for residents who log in with their phone number, forwarded on WhatsApp by an admin in one tap. They then stay logged in for 6 months.
 - **Installable**: residents can add the site to their phone's home screen. On iPhone this is
   required for notifications (iOS 16.4 or later).
 

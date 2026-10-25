@@ -24,7 +24,7 @@ def test_pages_require_login(client):
 
 def test_login_flow_and_single_use_link(client, outbox):
     token = csrf(client)
-    client.post("/connexion", data={"email": "ALICE@test.fr", "csrf_token": token})
+    client.post("/connexion", data={"identifiant": "ALICE@test.fr", "csrf_token": token})
     assert len(outbox) == 1 and outbox[0]["To"] == "alice@test.fr"
     link = re.search(r"https://copro\.test(/connexion/\S+)", outbox[0].get_content()).group(1)
 
@@ -40,7 +40,7 @@ def test_login_flow_and_single_use_link(client, outbox):
 
 
 def test_unknown_email_gets_same_answer_and_no_mail(client, outbox):
-    response = client.post("/connexion", data={"email": "x@nowhere.fr", "csrf_token": csrf(client)})
+    response = client.post("/connexion", data={"identifiant": "x@nowhere.fr", "csrf_token": csrf(client)})
     assert "Vérifiez votre messagerie" in response.get_data(as_text=True)
     assert outbox == []
 
@@ -229,7 +229,7 @@ def test_site_name_shown_to_residents(client, outbox):
     page = client.get("/connexion").get_data(as_text=True)
     assert "<title>Connexion – Le 53 Bourrassol</title>" in page
     assert "Le 53" in page and "rue de Bourrassol" in page and "GCCopro" not in page
-    client.post("/connexion", data={"email": "alice@test.fr", "csrf_token": csrf(client)})
+    client.post("/connexion", data={"identifiant": "alice@test.fr", "csrf_token": csrf(client)})
     assert outbox[-1]["Subject"] == "Votre lien de connexion – Le 53 Bourrassol"
 
 

@@ -7,7 +7,7 @@ import click
 from flask import Flask, current_app
 from flask.cli import with_appcontext
 
-from . import auth, clock, push, reminders
+from . import auth, clock, phones, push, reminders
 from .db import get_db
 
 
@@ -30,14 +30,21 @@ def create_admin(name: str, email: str, apartment: str) -> None:
 
 @click.command("login-link")
 @with_appcontext
-@click.argument("email")
-def login_link(email: str) -> None:
-    """Print a one-time login link for EMAIL (works without any email setup)."""
+@click.argument("identifier")
+def login_link(identifier: str) -> None:
+    """Print a one-time login link for IDENTIFIER, an email or a phone number."""
+    if "@" in identifier:
+        column, value = "email", identifier.strip()
+    else:
+        try:
+            column, value = "phone", phones.normalize(identifier)
+        except phones.PhoneError:
+            raise click.ClickException(f"{identifier!r} is neither an email nor a phone number.")
     resident = get_db().execute(
-        "SELECT * FROM residents WHERE email = ? AND active = 1", (email.strip(),)
+        f"SELECT * FROM residents WHERE {column} = ? AND active = 1", (value,)
     ).fetchone()
     if resident is None:
-        raise click.ClickException(f"No active resident with email {email}.")
+        raise click.ClickException(f"No active resident with {column} {value}.")
     token = auth.create_login_token(resident["id"])
     base = current_app.config["BASE_URL"].rstrip("/")
     click.echo(f"{base}/connexion/{token}")

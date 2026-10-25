@@ -99,12 +99,16 @@ def run(today: date, dry_run: bool = False) -> list[str]:
             delivered = push.send_to_resident(rid, title, body, "/")
             channel = "push"
             if delivered == 0:
-                mail.send_mail(
-                    resident["email"],
-                    f"{title} – {site}",
-                    f"Bonjour {resident['name']},\n\n{body}\n\n{base_url}/\n",
-                )
-                channel = "email"
+                if resident["email"]:
+                    mail.send_mail(
+                        resident["email"],
+                        f"{title} – {site}",
+                        f"Bonjour {resident['name']},\n\n{body}\n\n{base_url}/\n",
+                    )
+                    channel = "email"
+                else:
+                    # Phone-only resident without notifications enabled: nothing to send.
+                    channel = "not reached: no push subscription, no email"
             _record("trash", rid, tomorrow)
             report.append(f"trash -> {resident['name']} ({channel}): {body}")
     elif labels and owner_id is None:
@@ -127,7 +131,7 @@ def run(today: date, dry_run: bool = False) -> list[str]:
             if push.send_to_resident(resident["id"], "Semaine à réserver", text, "/"):
                 _record("free_week", resident["id"], week)
                 report.append(f"free week -> {resident['name']} (push): {text}")
-        for admin in (r for r in residents if r["role"] == "admin"):
+        for admin in (r for r in residents if r["role"] == "admin" and r["email"]):
             if _already_sent("free_week_admin", admin["id"], week):
                 continue
             if dry_run:

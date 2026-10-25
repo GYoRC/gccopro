@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
-from .. import auth, clock, frdates, push, rules, trash
+from .. import auth, clock, frdates, phones, push, rules, trash
 from ..auth import admin_required
 from ..db import SETTINGS_DEFAULTS, bookings_between, get_db, get_resident, get_setting, set_setting
 from . import parse_date
@@ -42,6 +42,11 @@ def index():
     return render_template(
         "admin/index.html",
         residents=db.execute("SELECT * FROM residents ORDER BY active DESC, name").fetchall(),
+        login_requests=db.execute(
+            "SELECT q.id, q.requested_at, r.id AS resident_id, r.name, r.apartment, r.phone"
+            " FROM login_requests q JOIN residents r ON r.id = q.resident_id"
+            " WHERE q.handled_at IS NULL AND r.active = 1 ORDER BY q.requested_at"
+        ).fetchall(),
         weeks=weeks,
         apartments=current_app.config["APARTMENTS"],
         trash_rules=db.execute("SELECT * FROM trash_rules ORDER BY weekday, label").fetchall(),
@@ -65,14 +70,37 @@ def index():
 
 # --- Residents --------------------------------------------------------------------
 
+def _contact_fields() -> tuple[str | None, str | None]:
+    """Read and validate the email / phone form fields; at least one is required.
+
+    Returns:
+        ``(email, phone)``, each None when left blank; the phone in E.164.
+
+    Raises:
+        ValueError: With a French message for the admin when the input is invalid.
+    """
+    email = request.form.get("email", "").strip() or None
+    raw_phone = request.form.get("phone", "").strip()
+    if email is not None and "@" not in email:
+        raise ValueError("Adresse e-mail invalide.")
+    phone = phones.normalize(raw_phone) if raw_phone else None  # PhoneError is a ValueError
+    if email is None and phone is None:
+        raise ValueError("Indiquez au moins une adresse e-mail ou un numéro de téléphone.")
+    return email, phone
+
+
 @bp.post("/residents/ajouter")
 @admin_required
 def add_resident():
     """Register a resident; optionally email them a login link right away."""
     name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip()
-    if not name or "@" not in email:
-        flash("Nom et adresse e-mail valides obligatoires.", "erreur")
+    if not name:
+        flash("Le nom est obligatoire.", "erreur")
+        return _back()
+    try:
+        email, phone = _contact_fields()
+    except ValueError as exc:
+        flash(str(exc), "erreur")
         return _back()
     apartment = request.form.get("apartment", "")
     if apartment not in current_app.config["APARTMENTS"]:
@@ -82,19 +110,48 @@ def add_resident():
     try:
         with db:
             cur = db.execute(
-                "INSERT INTO residents (name, email, apartment, role) VALUES (?, ?, ?, ?)",
-                (name, email, apartment,
+                "INSERT INTO residents (name, email, phone, apartment, role) VALUES (?, ?, ?, ?, ?)",
+                (name, email, phone, apartment,
                  "admin" if request.form.get("is_admin") else "resident"),
             )
     except sqlite3.IntegrityError:
-        flash("Cette adresse e-mail est déjà enregistrée.", "erreur")
+        flash("Cette adresse e-mail ou ce numéro est déjà enregistré.", "erreur")
         return _back()
-    if request.form.get("send_link"):
-        auth.send_login_link(get_resident(cur.lastrowid))
-        flash(f"{name} ajouté(e) ; un lien de connexion a été envoyé.", "ok")
+    if request.form.get("send_link") and auth.send_login_link(get_resident(cur.lastrowid)):
+        flash(f"{name} ajouté(e) ; un lien de connexion a été envoyé par e-mail.", "ok")
     else:
         flash(f"{name} ajouté(e).", "ok")
     return _back()
+
+
+@bp.route("/residents/<int:resident_id>/modifier", methods=["GET", "POST"])
+@admin_required
+def edit_resident(resident_id: int):
+    """Edit a resident's name, email and phone number."""
+    resident = get_resident(resident_id)
+    if resident is None:
+        abort(404)
+    if request.method == "GET":
+        return render_template("admin/resident_edit.html", resident=resident,
+                               phone=phones.display(resident["phone"]))
+    name = request.form.get("name", "").strip()
+    try:
+        if not name:
+            raise ValueError("Le nom est obligatoire.")
+        email, phone = _contact_fields()
+    except ValueError as exc:
+        flash(str(exc), "erreur")
+        return redirect(url_for(".edit_resident", resident_id=resident_id))
+    db = get_db()
+    try:
+        with db:
+            db.execute("UPDATE residents SET name = ?, email = ?, phone = ? WHERE id = ?",
+                       (name, email, phone, resident_id))
+    except sqlite3.IntegrityError:
+        flash("Cette adresse e-mail ou ce numéro appartient déjà à un autre résident.", "erreur")
+        return redirect(url_for(".edit_resident", resident_id=resident_id))
+    flash(f"{name} : coordonnées enregistrées.", "ok")
+    return redirect(url_for(".index") + "#residents")
 
 
 def _other_resident(resident_id: int):
@@ -160,9 +217,27 @@ def send_link(resident_id: int):
     resident = get_resident(resident_id)
     if resident is None or not resident["active"]:
         abort(404)
-    auth.send_login_link(resident)
-    flash(f"Lien de connexion envoyé à {resident['email']}.", "ok")
+    if auth.send_login_link(resident):
+        flash(f"Lien de connexion envoyé à {resident['email']}.", "ok")
+    else:
+        flash(f"{resident['name']} n’a pas d’adresse e-mail : utilisez WhatsApp.", "erreur")
     return _back()
+
+
+@bp.post("/residents/<int:resident_id>/whatsapp")
+@admin_required
+def whatsapp_link(resident_id: int):
+    """Create a 24 h login link and show the button that opens WhatsApp with it.
+
+    A page with a plain link is used rather than a redirect: the CSP's
+    ``form-action 'self'`` would block a form redirecting to wa.me.
+    """
+    resident = get_resident(resident_id)
+    if resident is None or not resident["active"] or not resident["phone"]:
+        abort(404)
+    wa_url, message = auth.whatsapp_link(resident)
+    return render_template("admin/whatsapp.html", resident=resident, wa_url=wa_url,
+                           message=message, phone=phones.display(resident["phone"]))
 
 
 # --- Weeks ------------------------------------------------------------------------

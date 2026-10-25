@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Modifier {{ resident.name }}{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Modifier un résident</h1>
+  <form method="post" action="{{ url_for('admin.edit_resident', resident_id=resident.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Nom <input name="name" required value="{{ resident.name }}"></label>
+    <label>E-mail <input type="email" name="email" value="{{ resident.email or '' }}"></label>
+    <label>Téléphone <input type="tel" name="phone" value="{{ phone }}" placeholder="06 12 34 56 78"></label>
+    <p class="muted small">Au moins l’un des deux. Le logement et le rôle se modifient depuis la liste des résidents.</p>
+    <div class="actions">
+      <button>Enregistrer</button>
+      <a class="button secondary" href="{{ url_for('admin.index') }}#residents">Annuler</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

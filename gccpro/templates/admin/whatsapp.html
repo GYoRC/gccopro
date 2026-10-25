@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Lien WhatsApp{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Envoyer le lien à {{ resident.name }}</h1>
+  <p>Un lien de connexion valable <strong>24 heures</strong> a été créé pour le {{ phone }}.
+     Le bouton ouvre WhatsApp avec ce message déjà rédigé : il ne reste qu’à l’envoyer.</p>
+  <blockquote class="message">{{ message }}</blockquote>
+  <div class="actions">
+    <a class="button" href="{{ wa_url }}" rel="noopener">Ouvrir WhatsApp</a>
+    <a class="button secondary" href="{{ url_for('admin.index') }}#residents">Retour</a>
+  </div>
+  <p class="muted small">Le lien ne fonctionne qu’une fois. Si le message n’est pas envoyé, il expire tout seul.</p>
+</section>
+{% endblock %}

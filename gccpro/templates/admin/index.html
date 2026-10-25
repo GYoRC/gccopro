@@ -11,11 +11,30 @@
   <a href="#annonces">Annonces</a> <a href="#reglages">Réglages</a>
 </nav>
 
+{% if login_requests %}
+<section class="card highlight" id="connexions">
+  <h2>Demandes de connexion</h2>
+  <p class="muted small">Ces résidents ont demandé un lien avec leur numéro de téléphone.
+     « Envoyer sur WhatsApp » ouvre la conversation avec le message prêt : il ne reste qu’à l’envoyer.</p>
+  <ul class="plain">
+    {% for q in login_requests %}
+    <li class="row">
+      <span><strong>{{ q.name }}</strong>{% if q.apartment %} ({{ q.apartment }}){% endif %}
+        · {{ q.phone | telephone }}</span>
+      <form method="post" action="{{ url_for('admin.whatsapp_link', resident_id=q.resident_id) }}">
+        {{ csrf('connexions') }}<button class="small">Envoyer sur WhatsApp</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="card" id="residents">
   <h2>Résidents</h2>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Nom</th><th>Logement</th><th>E-mail</th><th>Rôle</th><th></th></tr></thead>
+    <thead><tr><th>Nom</th><th>Logement</th><th>Contact</th><th>Rôle</th><th></th></tr></thead>
     <tbody>
     {% for r in residents %}
       <tr class="{% if not r.active %}inactive{% endif %}">
@@ -28,11 +47,15 @@
             </select>
             <button class="small secondary">OK</button>
           </form>
-        </td><td>{{ r.email }}</td>
+        </td><td>{% if r.email %}{{ r.email }}{% endif %}{% if r.email and r.phone %}<br>{% endif %}{% if r.phone %}{{ r.phone | telephone }}{% endif %}</td>
         <td>{{ 'Admin' if r.role == 'admin' else 'Résident' }}{% if not r.active %} · désactivé{% endif %}</td>
         <td class="buttons">
-          {% if r.active %}
-          <form method="post" action="{{ url_for('admin.send_link', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">Envoyer un lien</button></form>
+          <a class="button small secondary" href="{{ url_for('admin.edit_resident', resident_id=r.id) }}">Modifier</a>
+          {% if r.active and r.email %}
+          <form method="post" action="{{ url_for('admin.send_link', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">Lien par e-mail</button></form>
+          {% endif %}
+          {% if r.active and r.phone %}
+          <form method="post" action="{{ url_for('admin.whatsapp_link', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">Lien WhatsApp</button></form>
           {% endif %}
           {% if r.id != current_user.id %}
           <form method="post" action="{{ url_for('admin.toggle_role', resident_id=r.id) }}">{{ csrf('residents') }}<button class="small secondary">{{ 'Retirer admin' if r.role == 'admin' else 'Rendre admin' }}</button></form>
@@ -54,8 +77,10 @@
         {% for a in apartments %}<option>{{ a }}</option>{% endfor %}
       </select>
     </label>
-    <label>E-mail <input type="email" name="email" required></label>
-    <label class="check"><input type="checkbox" name="send_link" value="1" checked> Envoyer un lien de connexion</label>
+    <label>E-mail <input type="email" name="email"></label>
+    <label>Téléphone <input type="tel" name="phone" placeholder="06 12 34 56 78"></label>
+    <p class="muted small wide">E-mail ou téléphone : au moins l’un des deux.</p>
+    <label class="check"><input type="checkbox" name="send_link" value="1" checked> Envoyer un lien de connexion par e-mail</label>
     <label class="check"><input type="checkbox" name="is_admin" value="1"> Administrateur</label>
     <button>Ajouter</button>
   </form>

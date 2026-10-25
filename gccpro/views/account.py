@@ -1,11 +1,11 @@
-"""Login by email link, logout, and the resident's own weeks page."""
+"""Login by link (email or WhatsApp via an admin), logout, and the resident's own weeks page."""
 
 from datetime import date
 
 from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
                    request, session, url_for)
 
-from .. import auth, clock, frdates, push, rules
+from .. import auth, clock, frdates, phones, push, rules
 from ..auth import login_required
 from ..db import get_db, get_setting
 from . import parse_date, safe_back
@@ -16,25 +16,41 @@ bp = Blueprint("account", __name__)
 
 @bp.route("/connexion", methods=["GET", "POST"])
 def login():
-    """Ask for an email address and send a login link if it belongs to a resident.
+    """Ask for an email address or a phone number and start the matching login flow.
 
-    The response is identical whether or not the address is known, so the form
-    cannot be used to discover who lives in the building.
+    - Email: a login link is emailed to the resident.
+    - Phone: the admins are alerted and forward a link on WhatsApp.
+
+    The response is identical whether or not the email or number is known, so
+    the form cannot be used to discover who lives in the building.
     """
     if request.method == "GET":
         if g.user is not None:
             return redirect(url_for("calendar.index"))
         return render_template("login.html")
 
-    email = request.form.get("email", "").strip()
+    identifier = request.form.get("identifiant", "").strip()
+    if "@" in identifier:
+        kind, value = "email", identifier
+    else:
+        try:
+            kind, value = "phone", phones.normalize(identifier)
+        except phones.PhoneError:
+            flash("Saisissez une adresse e-mail ou un numéro de téléphone valide.", "erreur")
+            return render_template("login.html", identifier=identifier), 400
+
     ip = request.remote_addr or "?"
-    if email and auth.allow_login_request(email, ip):
+    if auth.allow_login_request(value, ip):
         resident = get_db().execute(
-            "SELECT * FROM residents WHERE email = ? AND active = 1", (email,)
+            f"SELECT * FROM residents WHERE {kind} = ? AND active = 1", (value,)
         ).fetchone()
         if resident is not None:
-            auth.send_login_link(resident)
-    return render_template("login_sent.html", email=email)
+            if kind == "email":
+                auth.send_login_link(resident)
+            else:
+                auth.request_whatsapp_link(resident)
+    shown = value if kind == "email" else phones.display(value)
+    return render_template("login_sent.html", kind=kind, identifier=shown)
 
 
 @bp.get("/connexion/<token>")
