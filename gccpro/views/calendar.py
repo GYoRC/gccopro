@@ -1,7 +1,7 @@
 """Calendar page: the upcoming weeks, who is on duty, and booking.
 
-Three views share the same per-week data (:func:`week_infos`): a year of twelve
-mini-months, a month grid (default) where each row is one Monday-to-Sunday week,
+Three views (year by default) share the same per-week data (:func:`week_infos`): a year of twelve
+mini-months, a month grid where each row is one Monday-to-Sunday week,
 and the list of upcoming weeks. The resident's own upcoming weeks (with the
 cancel buttons) are shown under every view.
 """
@@ -195,9 +195,12 @@ def my_upcoming(today: date, resident_id: int) -> list[dict]:
 @bp.get("/")
 @login_required
 def index():
-    """Show the calendar as a month grid (default), a year, or a list (``?vue=``)."""
+    """Show the calendar as a year (default), a month grid, or a list (``?vue=``).
+
+    A link with ``mois`` but no ``vue`` (month navigation, week links) means the month grid.
+    """
     today = clock.today()
-    view = request.args.get("vue")
+    view = request.args.get("vue") or ("mois" if "mois" in request.args else "annee")
     mine = my_upcoming(today, g.user["id"])
     if view == "liste":
         first = rules.monday_of(today)
@@ -209,11 +212,11 @@ def index():
             week += rules.WEEK
         return render_template("calendar.html", view="liste", mine=mine,
                                rows=week_infos(mondays, today, g.user["id"]))
-    if view == "annee":
-        return render_template("calendar.html", view="annee", today=today, mine=mine,
-                               year=build_year(today, g.user["id"]))
-    return render_template("calendar.html", view="mois", today=today, mine=mine,
-                           cal=build_month(today, g.user["id"]))
+    if view == "mois":
+        return render_template("calendar.html", view="mois", today=today, mine=mine,
+                               cal=build_month(today, g.user["id"]))
+    return render_template("calendar.html", view="annee", today=today, mine=mine,
+                           year=build_year(today, g.user["id"]))
 
 
 @bp.post("/reserver")

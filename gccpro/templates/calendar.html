@@ -5,11 +5,11 @@
 {% block content %}
 <h1>Calendrier d’entretien</h1>
 <p class="intro">Chaque semaine, du lundi au dimanche, la personne inscrite nettoie les parties communes,
-  sort les poubelles et nettoie le parking. Vous pouvez réserver 1 ou 2 semaines d’affilée.</p>
+  sort les poubelles (optionnellement, nettoie le parking). Vous pouvez réserver 1 ou 2 semaines d’affilée.</p>
 
 <nav class="switch" aria-label="Affichage">
-  <a href="{{ url_for('calendar.index', vue='annee') }}"{% if view == 'annee' %} aria-current="page"{% endif %}>{{ icon("year") }}Année</a>
-  <a href="{{ url_for('calendar.index') }}"{% if view == 'mois' %} aria-current="page"{% endif %}>{{ icon("calendar") }}Mois</a>
+  <a href="{{ url_for('calendar.index') }}"{% if view == 'annee' %} aria-current="page"{% endif %}>{{ icon("year") }}Année</a>
+  <a href="{{ url_for('calendar.index', vue='mois') }}"{% if view == 'mois' %} aria-current="page"{% endif %}>{{ icon("calendar") }}Mois</a>
   <a href="{{ url_for('calendar.index', vue='liste') }}"{% if view == 'liste' %} aria-current="page"{% endif %}>{{ icon("list") }}Liste</a>
 </nav>
 

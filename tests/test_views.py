@@ -79,7 +79,7 @@ def test_cannot_book_someone_elses_week(client, app, outbox):
             db.execute("INSERT INTO bookings (week_start, resident_id) VALUES (?, 3)", (NEXT_MONDAY,))
     login(client, outbox, "alice@test.fr")
     assert "déjà réservée" in book(client, NEXT_MONDAY).get_data(as_text=True)
-    assert "Bruno" in client.get("/").get_data(as_text=True)
+    assert "Bruno" in client.get("/?vue=mois").get_data(as_text=True)
 
 
 def test_cancel_rules(client, app, outbox):
@@ -115,7 +115,7 @@ def test_admin_assigns_and_manages(client, app, outbox):
                                                  "frequency": "weekly", "csrf_token": token})
     client.post("/admin/annonces/ajouter", data={"title": "Assemblée Générale", "body": "Salle commune, 19 h",
                                                 "event_date": "2026-11-20", "csrf_token": token})
-    page = client.get("/").get_data(as_text=True)
+    page = client.get("/?vue=liste").get_data(as_text=True)
     assert "Bruno" in page and "Ordures ménagères" in page
     page = client.get("/infos").get_data(as_text=True)
     assert "Prochain rendez-vous" in page and "vendredi 20 novembre 2026" in page
@@ -177,7 +177,7 @@ def test_month_mondays():
 
 def test_month_view_select_and_book(client, outbox):
     login(client, outbox, "alice@test.fr")
-    page = client.get("/").get_data(as_text=True)
+    page = client.get("/?vue=mois").get_data(as_text=True)
     assert "Octobre 2026" in page and "?mois=2026-11" in page
     assert 'id="semaine-choisie"' not in page
 
@@ -203,7 +203,7 @@ def test_month_view_tolerates_bad_parameters(client, outbox):
 def test_year_view(client, outbox):
     login(client, outbox, "alice@test.fr")
     book(client, NEXT_MONDAY)
-    page = client.get("/?vue=annee").get_data(as_text=True)
+    page = client.get("/").get_data(as_text=True)
     assert "Novembre" in page and "mini-week mine" in page and "Mes prochaines semaines" in page
     assert client.get("/?vue=annee&annee=nope").status_code == 200
     assert "2027" in client.get("/?vue=annee&annee=2027").get_data(as_text=True)

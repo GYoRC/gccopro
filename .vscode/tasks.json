@@ -1,0 +1,42 @@
+{
+  // Run with Terminal > Run Task. Both tasks use Git Bash explicitly, because a bare
+  // "bash" can resolve to WSL on Windows.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Tests",
+      "type": "shell",
+      "command": ".venv/Scripts/python -m pytest -q",
+      "options": {
+        "shell": { "executable": "C:\\Program Files\\Git\\bin\\bash.exe", "args": ["-c"] }
+      },
+      "group": "test",
+      "presentation": { "panel": "dedicated", "clear": true },
+      "problemMatcher": []
+    },
+    {
+      // Copies the code to the NAS over ssh, then installs dependencies and restarts the server.
+      "label": "Deploy to NAS",
+      "type": "shell",
+      "command": "bash deploy/deploy.sh",
+      "dependsOn": ["Tests"],
+      "options": {
+        "shell": { "executable": "C:\\Program Files\\Git\\bin\\bash.exe", "args": ["-c"] }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "panel": "dedicated", "clear": true, "focus": true },
+      "problemMatcher": []
+    },
+    {
+      // Same as above without running the tests first.
+      "label": "Deploy to NAS (skip tests)",
+      "type": "shell",
+      "command": "bash deploy/deploy.sh",
+      "options": {
+        "shell": { "executable": "C:\\Program Files\\Git\\bin\\bash.exe", "args": ["-c"] }
+      },
+      "presentation": { "panel": "dedicated", "clear": true, "focus": true },
+      "problemMatcher": []
+    }
+  ]
+}
