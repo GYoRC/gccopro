@@ -3,6 +3,7 @@
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid, parseaddr
 
 import certifi
 from flask import current_app
@@ -16,10 +17,17 @@ def send_mail(to: str, subject: str, body: str) -> None:
     (tests).
     """
     cfg = current_app.config
+    sender = cfg["MAIL_FROM"] or cfg["SMTP_USER"]
+    sender_address = parseaddr(sender)[1]
     msg = EmailMessage()
-    msg["From"] = cfg["MAIL_FROM"] or cfg["SMTP_USER"]
+    msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = subject
+    # smtplib adds neither header; mail without them scores higher as spam.
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=sender_address.rpartition("@")[2] or None)
+    if sender_address:
+        msg["Reply-To"] = sender_address
     msg.set_content(body)
 
     backend = cfg["MAIL_BACKEND"]

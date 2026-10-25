@@ -233,6 +233,16 @@ def test_site_name_shown_to_residents(client, outbox):
     assert outbox[-1]["Subject"] == "Votre lien de connexion – Le 53 Bourrassol"
 
 
+def test_emails_have_date_and_message_id(app, outbox):
+    from gccpro import mail
+    with app.app_context():
+        app.config["MAIL_FROM"] = "Le 53 Bourrassol <le53@example.org>"
+        mail.send_mail("alice@test.fr", "Sujet", "Corps")
+    msg = outbox[-1]
+    assert msg["Date"] and msg["Message-ID"].endswith("@example.org>")
+    assert msg["Reply-To"] == "le53@example.org"
+
+
 def test_manifest_and_service_worker(client):
     manifest = client.get("/manifest.webmanifest").json
     assert manifest["lang"] == "fr" and manifest["short_name"] == "Le 53"
