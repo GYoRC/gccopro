@@ -7,7 +7,7 @@
  * Show the notification described by the push payload ({title, body, url}).
  */
 self.addEventListener("push", (event) => {
-  let data = { title: "GCCopro", body: "", url: "/" };
+  let data = { title: "Notification", body: "", url: "/" };
   try {
     data = Object.assign(data, event.data ? event.data.json() : {});
   } catch (err) {

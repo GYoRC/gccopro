@@ -50,6 +50,21 @@ def test_trash_reminder_goes_to_person_on_duty(app, sent):
     assert "Bruno" in lines[0]
 
 
+def test_trash_reminder_goes_to_whole_apartment(app, sent):
+    with app.app_context():
+        db = get_db()
+        with db:
+            db.execute("INSERT INTO residents (id, name, email, apartment)"
+                       " VALUES (4, 'Chloé', 'chloe@test.fr', ' apt 3 ')")
+    setup_db(app, subscribe=(3, 4))
+    with app.app_context():
+        lines = reminders.run(date(2026, 10, 26))
+        reminders.run(date(2026, 10, 26))  # idempotent per resident
+    assert sorted(endpoint for endpoint, _ in sent) == [
+        "https://push.example/3", "https://push.example/4"]
+    assert len(lines) == 2
+
+
 def test_monday_pickup_is_reminded_to_previous_weeks_resident(app, sent):
     setup_db(app)
     with app.app_context():

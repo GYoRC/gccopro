@@ -28,5 +28,9 @@
         "titleBar.inactiveBackground": "#5d81fa99",
         "titleBar.inactiveForeground": "#15202b99"
     },
-    "peacock.color": "#5d81fa"
+    "peacock.color": "#5d81fa",
+    // Always show the selected run configuration ("GCCopro: dev server") with a ▷
+    // start button in the status bar.
+    "debug.showInStatusBar": "always",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe"
 }

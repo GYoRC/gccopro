@@ -1,0 +1,23 @@
+{
+    // Run configurations. "GCCopro: dev server" also appears as a ▷ button in the
+    // status bar (see "debug.showInStatusBar" in settings.json).
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "GCCopro: dev server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            // --debug keeps auto-reload on code changes; --no-debugger leaves
+            // breakpoints to VS Code instead of Werkzeug's in-browser debugger.
+            "args": ["--app", "gccpro", "run", "--debug", "--no-debugger", "--port", "5000"],
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}",
+            "jinja": true,
+            // Integrated terminal, so the login links printed by the console
+            // mail backend are easy to copy.
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

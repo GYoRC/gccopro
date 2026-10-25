@@ -28,6 +28,12 @@ def defaults(app: Flask) -> dict:
     """
     return {
         "SECRET_KEY": DEV_SECRET_KEY,
+        # Name shown to residents ("GCCopro" is only the developer-facing name).
+        "SITE_NAME": "Le 53 Bourrassol",
+        "SITE_SHORT_NAME": "Le 53",          # header, home-screen icon label (~12 chars max)
+        "SITE_TAGLINE": "rue de Bourrassol",  # second line of the header
+        # Fixed list of apartments an admin can pick for a resident.
+        "APARTMENTS": [f"Apt {n}" for n in range(1, 8)],
         "DATABASE": str(Path(app.instance_path) / "gccpro.db"),
         # Public base URL used to build links in emails and notifications.
         "BASE_URL": "http://127.0.0.1:5000",

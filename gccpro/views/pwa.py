@@ -20,8 +20,9 @@ def service_worker():
 def manifest():
     """Describe the app for "Add to home screen" (required for push on iPhone)."""
     response = jsonify({
-        "name": "GCCopro – Entretien de l’immeuble",
-        "short_name": "GCCopro",
+        "name": current_app.config["SITE_NAME"],
+        "short_name": current_app.config["SITE_SHORT_NAME"],
+        "description": "Calendrier d’entretien de l’immeuble",
         "lang": "fr",
         "start_url": "/",
         "scope": "/",

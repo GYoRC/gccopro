@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 Chores rota for a building in France: residents book whole weeks (Monday–Sunday, 1 or 2 consecutive, max 2 in a row) to clean common areas, take out the trash and clean the parking lot; the person on duty gets a push notification the evening before each trash pickup. Also shows building info (e.g. Assemblée Générale date). **All user-facing text is French**; code, comments and logs are English.
+- "GCCopro" is the developer-facing name only. Residents see "Le 53 Bourrassol" (header "Le 53" / "rue de Bourrassol"), from the `SITE_NAME`, `SITE_SHORT_NAME` and `SITE_TAGLINE` config keys; never hard-code the name in templates, emails or notifications.
 
 ## Stack
 - Python 3.12, Flask + Jinja2 server-rendered pages, Waitress, SQLite (stdlib `sqlite3`). Plain JS in `gccpro/static/` only for the service worker and push button; no Node, no build step.
@@ -32,7 +33,7 @@ Chores rota for a building in France: residents book whole weeks (Monday–Sunda
 
 ## Production on the NAS
 - Layout: `/volume1/homes/claude/gccpro/{app,venv,data}`; `data/` holds `config.toml` (secrets, chmod 600), `gccpro.db`, `backups/`, `logs/`. Deploys replace only `app/`.
-- Waitress listens on `127.0.0.1:8090` behind the DSM reverse proxy (HTTPS on `NAS.yoanngualtieri.xyz`). DSM Task Scheduler (as user `claude`): `deploy/start.sh` at boot and every 5 min (watchdog), `deploy/reminders.sh` daily 18:00, `deploy/backup.sh` nightly.
+- Waitress listens on `127.0.0.1:8090` behind the DSM reverse proxy (HTTPS on `le53.yoanngualtieri.xyz`, a CNAME to `nas.yoanngualtieri.xyz` whose A record is kept current by OVH DynHost). DSM Task Scheduler (as user `claude`): `deploy/start.sh` at boot and every 5 min (watchdog), `deploy/reminders.sh` daily 18:00, `deploy/backup.sh` nightly.
 - Logs: `data/logs/{server,reminders,backup}.log`.
 
 ## Hosting constraints (Synology DS216j)

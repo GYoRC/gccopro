@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import date
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from .. import auth, clock, frdates, push, rules, trash
 from ..auth import admin_required
@@ -43,6 +43,7 @@ def index():
         "admin/index.html",
         residents=db.execute("SELECT * FROM residents ORDER BY active DESC, name").fetchall(),
         weeks=weeks,
+        apartments=current_app.config["APARTMENTS"],
         trash_rules=db.execute("SELECT * FROM trash_rules ORDER BY weekday, label").fetchall(),
         exceptions=db.execute(
             "SELECT e.*, t.label FROM trash_exceptions e JOIN trash_rules t ON t.id = e.rule_id"
@@ -70,12 +71,16 @@ def add_resident():
     if not name or "@" not in email:
         flash("Nom et adresse e-mail valides obligatoires.", "erreur")
         return _back()
+    apartment = request.form.get("apartment", "")
+    if apartment not in current_app.config["APARTMENTS"]:
+        flash("Choisissez un logement dans la liste.", "erreur")
+        return _back()
     db = get_db()
     try:
         with db:
             cur = db.execute(
                 "INSERT INTO residents (name, email, apartment, role) VALUES (?, ?, ?, ?)",
-                (name, email, request.form.get("apartment", "").strip(),
+                (name, email, apartment,
                  "admin" if request.form.get("is_admin") else "resident"),
             )
     except sqlite3.IntegrityError:
@@ -98,6 +103,24 @@ def _other_resident(resident_id: int):
         flash("Vous ne pouvez pas modifier votre propre compte ici.", "erreur")
         return None
     return resident
+
+
+@bp.post("/residents/<int:resident_id>/logement")
+@admin_required
+def set_apartment(resident_id: int):
+    """Change a resident's apartment (any resident, including the admin's own)."""
+    resident = get_resident(resident_id)
+    if resident is None:
+        abort(404)
+    apartment = request.form.get("apartment", "")
+    if apartment not in current_app.config["APARTMENTS"]:
+        flash("Choisissez un logement dans la liste.", "erreur")
+        return _back()
+    db = get_db()
+    with db:
+        db.execute("UPDATE residents SET apartment = ? WHERE id = ?", (apartment, resident_id))
+    flash(f"{resident['name']} : logement {apartment}.", "ok")
+    return _back()
 
 
 @bp.post("/residents/<int:resident_id>/activer")
@@ -312,7 +335,7 @@ def save_settings():
 @admin_required
 def test_notification():
     """Send a test push to the admin's own devices."""
-    count = push.send_to_resident(g.user["id"], "Test GCCopro",
+    count = push.send_to_resident(g.user["id"], f"Test – {current_app.config['SITE_SHORT_NAME']}",
                                   "Les notifications fonctionnent.", "/admin")
     if count:
         flash(f"Notification envoyée à {count} appareil(s).", "ok")

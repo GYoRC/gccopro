@@ -19,7 +19,16 @@
     <tbody>
     {% for r in residents %}
       <tr class="{% if not r.active %}inactive{% endif %}">
-        <td>{{ r.name }}</td><td>{{ r.apartment }}</td><td>{{ r.email }}</td>
+        <td>{{ r.name }}</td><td>
+          <form method="post" action="{{ url_for('admin.set_apartment', resident_id=r.id) }}" class="inline-form">
+            {{ csrf('residents') }}
+            <select name="apartment" aria-label="Logement de {{ r.name }}">
+              {% if r.apartment not in apartments %}<option value="" selected>{{ r.apartment or '—' }}</option>{% endif %}
+              {% for a in apartments %}<option{% if a == r.apartment %} selected{% endif %}>{{ a }}</option>{% endfor %}
+            </select>
+            <button class="small secondary">OK</button>
+          </form>
+        </td><td>{{ r.email }}</td>
         <td>{{ 'Admin' if r.role == 'admin' else 'Résident' }}{% if not r.active %} · désactivé{% endif %}</td>
         <td class="buttons">
           {% if r.active %}
@@ -39,7 +48,12 @@
   <form method="post" action="{{ url_for('admin.add_resident') }}" class="grid">
     {{ csrf('residents') }}
     <label>Nom <input name="name" required></label>
-    <label>Logement <input name="apartment" placeholder="ex. Apt 3"></label>
+    <label>Logement
+      <select name="apartment" required>
+        <option value="">—</option>
+        {% for a in apartments %}<option>{{ a }}</option>{% endfor %}
+      </select>
+    </label>
     <label>E-mail <input type="email" name="email" required></label>
     <label class="check"><input type="checkbox" name="send_link" value="1" checked> Envoyer un lien de connexion</label>
     <label class="check"><input type="checkbox" name="is_admin" value="1"> Administrateur</label>

@@ -124,8 +124,22 @@ def test_admin_assigns_and_manages(client, app, outbox):
 def test_admin_adds_resident_and_sends_link(client, outbox):
     login(client, outbox, "admin@test.fr")
     client.post("/admin/residents/ajouter", data={"name": "Chloé", "email": "chloe@test.fr",
-                                                 "send_link": "1", "csrf_token": csrf(client)})
+                                                 "apartment": "Apt 4", "send_link": "1",
+                                                 "csrf_token": csrf(client)})
     assert outbox[-1]["To"] == "chloe@test.fr"
+
+
+def test_apartment_must_come_from_fixed_list(client, app, outbox):
+    login(client, outbox, "admin@test.fr")
+    client.post("/admin/residents/ajouter", data={"name": "Dan", "email": "dan@test.fr",
+                                                 "apartment": "Apt 99", "csrf_token": csrf(client)})
+    client.post("/admin/residents/2/logement", data={"apartment": "Apt 7", "csrf_token": csrf(client)})
+    client.post("/admin/residents/3/logement", data={"apartment": "Villa", "csrf_token": csrf(client)})
+    with app.app_context():
+        db = get_db()
+        assert db.execute("SELECT 1 FROM residents WHERE email = 'dan@test.fr'").fetchone() is None
+        assert db.execute("SELECT apartment FROM residents WHERE id = 2").fetchone()[0] == "Apt 7"
+        assert db.execute("SELECT apartment FROM residents WHERE id = 3").fetchone()[0] == "Apt 3"
 
 
 def test_deactivated_resident_is_logged_out(client, app, outbox):
@@ -211,6 +225,15 @@ def test_login_link_command(app, client):
     assert result.exit_code != 0
 
 
+def test_site_name_shown_to_residents(client, outbox):
+    page = client.get("/connexion").get_data(as_text=True)
+    assert "<title>Connexion – Le 53 Bourrassol</title>" in page
+    assert "Le 53" in page and "rue de Bourrassol" in page and "GCCopro" not in page
+    client.post("/connexion", data={"email": "alice@test.fr", "csrf_token": csrf(client)})
+    assert outbox[-1]["Subject"] == "Votre lien de connexion – Le 53 Bourrassol"
+
+
 def test_manifest_and_service_worker(client):
-    assert client.get("/manifest.webmanifest").json["lang"] == "fr"
+    manifest = client.get("/manifest.webmanifest").json
+    assert manifest["lang"] == "fr" and manifest["short_name"] == "Le 53"
     assert "showNotification" in client.get("/sw.js").get_data(as_text=True)

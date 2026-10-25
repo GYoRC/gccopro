@@ -4,13 +4,13 @@
 # Long random string: python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 SECRET_KEY = "change-me"
 
-BASE_URL = "https://NAS.yoanngualtieri.xyz"
+BASE_URL = "https://le53.yoanngualtieri.xyz"
 DATABASE = "/var/services/homes/claude/gccpro/data/gccpro.db"
 SESSION_COOKIE_SECURE = true
 
 # "smtp" to send real emails; "console" writes them to data/logs/server.log instead.
 MAIL_BACKEND = "smtp"
-MAIL_FROM = "GCCopro <copro@yoanngualtieri.xyz>"
+MAIL_FROM = "Le 53 Bourrassol <copro@yoanngualtieri.xyz>"
 SMTP_HOST = "smtp.example.org"
 SMTP_PORT = 465          # 465 = implicit TLS; use 587 with SMTP_STARTTLS = true
 SMTP_STARTTLS = false

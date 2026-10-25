@@ -1,7 +1,7 @@
 """Daily reminder job, run by DSM Task Scheduler via ``flask send-reminders``.
 
 Sends, at most once each (tracked in ``notification_log``):
-- a push to the resident on duty when there is a trash pickup tomorrow, with an
+- a push to the resident on duty and the rest of their apartment when there is a trash pickup tomorrow, with an
   email fallback when they have no push subscription;
 - a push to every resident for each unbooked week coming up soon;
 - an email to the administrators for each such unbooked week.
@@ -33,6 +33,23 @@ def _record(kind: str, resident_id: int, ref: date) -> None:
         )
 
 
+def household(resident_id: int) -> list:
+    """Return the active residents to notify for a booking by ``resident_id``.
+
+    That is every active resident sharing the booker's apartment (compared
+    case-insensitively); the booker alone when their apartment is blank.
+    """
+    booker = get_resident(resident_id)
+    apartment = (booker["apartment"] or "").strip()
+    if not apartment:
+        return [booker]
+    return get_db().execute(
+        "SELECT * FROM residents WHERE active = 1 AND lower(trim(apartment)) = lower(?)"
+        " ORDER BY id",
+        (apartment,),
+    ).fetchall()
+
+
 def run(today: date, dry_run: bool = False) -> list[str]:
     """Send today's reminders.
 
@@ -45,6 +62,7 @@ def run(today: date, dry_run: bool = False) -> list[str]:
     """
     report: list[str] = []
     base_url = current_app.config["BASE_URL"].rstrip("/")
+    site = current_app.config["SITE_NAME"]
     owners = booking_owners(today - timedelta(weeks=1), today + timedelta(weeks=12))
 
     # 1. Trash pickups tomorrow.
@@ -52,24 +70,27 @@ def run(today: date, dry_run: bool = False) -> list[str]:
     rule_list, exceptions = trash_config()
     labels = [p.label for p in trash.pickups(rule_list, exceptions, tomorrow, tomorrow)]
     owner_id = rules.reminder_recipient(tomorrow, owners)
-    if labels and owner_id is not None and not _already_sent("trash", owner_id, tomorrow):
-        resident = get_resident(owner_id)
+    if labels and owner_id is not None:
         what = ", ".join(labels)
         title = "Poubelles à sortir ce soir"
         body = f"Collecte demain, {frdates.date_courte(tomorrow)} : {what}."
-        if dry_run:
-            report.append(f"[dry-run] trash -> {resident['name']}: {body}")
-        else:
-            delivered = push.send_to_resident(owner_id, title, body, "/")
+        for resident in household(owner_id):
+            rid = resident["id"]
+            if _already_sent("trash", rid, tomorrow):
+                continue
+            if dry_run:
+                report.append(f"[dry-run] trash -> {resident['name']}: {body}")
+                continue
+            delivered = push.send_to_resident(rid, title, body, "/")
             channel = "push"
             if delivered == 0:
                 mail.send_mail(
                     resident["email"],
-                    f"{title} – GCCopro",
+                    f"{title} – {site}",
                     f"Bonjour {resident['name']},\n\n{body}\n\n{base_url}/\n",
                 )
                 channel = "email"
-            _record("trash", owner_id, tomorrow)
+            _record("trash", rid, tomorrow)
             report.append(f"trash -> {resident['name']} ({channel}): {body}")
     elif labels and owner_id is None:
         report.append(f"trash pickup tomorrow ({', '.join(labels)}) but nobody booked the week")
@@ -99,7 +120,7 @@ def run(today: date, dry_run: bool = False) -> list[str]:
                 continue
             mail.send_mail(
                 admin["email"],
-                "Semaine non réservée – GCCopro",
+                f"Semaine non réservée – {site}",
                 f"{text}\n\nVous pouvez l’attribuer depuis l’administration : {base_url}/admin\n",
             )
             _record("free_week_admin", admin["id"], week)

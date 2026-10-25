@@ -63,7 +63,7 @@ def send_login_link(resident) -> None:
     link = current_app.config["BASE_URL"].rstrip("/") + url_for("account.login_confirm", token=token)
     mail.send_mail(
         resident["email"],
-        "Votre lien de connexion – GCCopro",
+        f"Votre lien de connexion – {current_app.config['SITE_NAME']}",
         f"Bonjour {resident['name']},\n\n"
         f"Voici votre lien de connexion au calendrier d’entretien de l’immeuble "
         f"(valable 15 minutes, utilisable une seule fois) :\n\n{link}\n\n"
