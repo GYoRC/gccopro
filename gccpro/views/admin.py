@@ -45,6 +45,9 @@ def index():
         weeks=weeks,
         apartments=current_app.config["APARTMENTS"],
         trash_rules=db.execute("SELECT * FROM trash_rules ORDER BY weekday, label").fetchall(),
+        fixed_dates=db.execute(
+            "SELECT * FROM trash_dates WHERE date >= ? ORDER BY date", (today.isoformat(),)
+        ).fetchall(),
         exceptions=db.execute(
             "SELECT e.*, t.label FROM trash_exceptions e JOIN trash_rules t ON t.id = e.rule_id"
             " WHERE e.date >= ? ORDER BY e.date",
@@ -229,6 +232,34 @@ def delete_trash_rule(rule_id: int):
     db = get_db()
     with db:
         db.execute("DELETE FROM trash_rules WHERE id = ?", (rule_id,))
+    flash("Collecte supprimée.", "ok")
+    return _back()
+
+
+@bp.post("/poubelles/dates/ajouter")
+@admin_required
+def add_trash_date():
+    """Add a one-off pickup on a fixed date (e.g. green waste)."""
+    label = request.form.get("label", "").strip()
+    day = parse_date(request.form.get("date"))
+    if not label:
+        flash("Collecte invalide.", "erreur")
+        return _back()
+    db = get_db()
+    with db:
+        db.execute("INSERT OR IGNORE INTO trash_dates (label, date) VALUES (?, ?)",
+                   (label, day.isoformat()))
+    flash(f"« {label} » ajoutée le {frdates.date_courte(day)}.", "ok")
+    return _back()
+
+
+@bp.post("/poubelles/dates/<int:date_id>/supprimer")
+@admin_required
+def delete_trash_date(date_id: int):
+    """Delete a fixed-date pickup."""
+    db = get_db()
+    with db:
+        db.execute("DELETE FROM trash_dates WHERE id = ?", (date_id,))
     flash("Collecte supprimée.", "ok")
     return _back()
 

@@ -1,7 +1,7 @@
 """Daily reminder job, run by DSM Task Scheduler via ``flask send-reminders``.
 
 Sends, at most once each (tracked in ``notification_log``):
-- a push to the resident on duty and the rest of their apartment when there is a trash pickup tomorrow, with an
+- a push to the resident on duty (plus the admins' apartment for fixed-date pickups) and the rest of their apartment when there is a trash pickup tomorrow, with an
   email fallback when they have no push subscription;
 - a push to every resident for each unbooked week coming up soon;
 - an email to the administrators for each such unbooked week.
@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from flask import current_app
 
 from . import frdates, mail, push, rules, trash
-from .db import booking_owners, get_db, get_resident, get_setting, trash_config
+from .db import booking_owners, fixed_pickups, get_db, get_resident, get_setting, trash_config
 
 
 def _already_sent(kind: str, resident_id: int, ref: date) -> bool:
@@ -50,6 +50,15 @@ def household(resident_id: int) -> list:
     ).fetchall()
 
 
+def admin_households() -> list:
+    """Return the active residents living in an apartment where an active admin lives."""
+    return get_db().execute(
+        "SELECT * FROM residents WHERE active = 1 AND trim(apartment) != '' AND lower(trim(apartment)) IN"
+        " (SELECT lower(trim(apartment)) FROM residents WHERE active = 1 AND role = 'admin')"
+        " ORDER BY id"
+    ).fetchall()
+
+
 def run(today: date, dry_run: bool = False) -> list[str]:
     """Send today's reminders.
 
@@ -68,13 +77,19 @@ def run(today: date, dry_run: bool = False) -> list[str]:
     # 1. Trash pickups tomorrow.
     tomorrow = today + timedelta(days=1)
     rule_list, exceptions = trash_config()
-    labels = [p.label for p in trash.pickups(rule_list, exceptions, tomorrow, tomorrow)]
+    due = trash.pickups(rule_list, exceptions, tomorrow, tomorrow, fixed_pickups())
+    labels = [p.label for p in due]
     owner_id = rules.reminder_recipient(tomorrow, owners)
     if labels and owner_id is not None:
         what = ", ".join(labels)
         title = "Poubelles à sortir ce soir"
         body = f"Collecte demain, {frdates.date_courte(tomorrow)} : {what}."
-        for resident in household(owner_id):
+        recipients = household(owner_id)
+        if any(p.special for p in due):
+            # Special pickups (fixed dates) also concern the admins' apartment.
+            known = {r["id"] for r in recipients}
+            recipients += [r for r in admin_households() if r["id"] not in known]
+        for resident in recipients:
             rid = resident["id"]
             if _already_sent("trash", rid, tomorrow):
                 continue

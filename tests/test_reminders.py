@@ -65,6 +65,26 @@ def test_trash_reminder_goes_to_whole_apartment(app, sent):
     assert len(lines) == 2
 
 
+def test_fixed_date_pickup_also_notifies_admin_apartment(app, sent):
+    setup_db(app, subscribe=(1, 3))
+    with app.app_context():
+        db = get_db()
+        with db:
+            db.execute("INSERT INTO trash_dates (label, date) VALUES ('Déchets verts', '2026-10-28')")
+        # Tuesday evening: Wednesday has only the fixed-date pickup, owned by Bruno's week.
+        reminders.run(date(2026, 10, 27))
+    assert sorted(endpoint for endpoint, _ in sent) == [
+        "https://push.example/1", "https://push.example/3"]
+    assert all("Déchets verts" in m["body"] for _, m in sent)
+
+
+def test_regular_pickup_does_not_notify_admin_apartment(app, sent):
+    setup_db(app, subscribe=(1, 3))
+    with app.app_context():
+        reminders.run(date(2026, 10, 26))
+    assert [endpoint for endpoint, _ in sent] == ["https://push.example/3"]
+
+
 def test_monday_pickup_is_reminded_to_previous_weeks_resident(app, sent):
     setup_db(app)
     with app.app_context():

@@ -12,7 +12,7 @@ from flask import Blueprint, flash, g, redirect, render_template, request, url_f
 
 from .. import clock, frdates, rules, trash
 from ..auth import login_required
-from ..db import bookings_between, get_db, get_setting, trash_config
+from ..db import bookings_between, get_db, fixed_pickups, get_setting, trash_config
 from . import parse_date, safe_back
 
 bp = Blueprint("calendar", __name__)
@@ -39,7 +39,8 @@ def week_infos(mondays: list[date], today: date, resident_id: int) -> list[dict]
 
     rule_list, exceptions = trash_config()
     pickups_by_week = defaultdict(list)
-    for pickup in trash.pickups(rule_list, exceptions, first, last + timedelta(days=6)):
+    for pickup in trash.pickups(rule_list, exceptions, first, last + timedelta(days=6),
+                                 fixed_pickups()):
         pickups_by_week[rules.monday_of(pickup.date)].append(pickup)
 
     events = defaultdict(list)

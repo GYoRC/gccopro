@@ -36,13 +36,26 @@ class Exception_:
     moved_to: date | None  # None means the pickup is cancelled
 
 
+@dataclass(frozen=True)
+class FixedPickup:
+    """A pickup on one fixed date, with no recurrence (e.g. green waste)."""
+
+    date: date
+    label: str
+
+
 @dataclass(frozen=True, order=True)
 class Pickup:
-    """One actual pickup on a given date."""
+    """One actual pickup on a given date.
+
+    ``special`` marks fixed-date pickups, which also notify the admins'
+    apartment; their ``rule_id`` is 0.
+    """
 
     date: date
     label: str
     rule_id: int
+    special: bool = False
 
 
 def occurs(rule: Rule, day: date) -> bool:
@@ -57,12 +70,14 @@ def occurs(rule: Rule, day: date) -> bool:
     return True
 
 
-def pickups(rules: list[Rule], exceptions: list[Exception_], start: date, end: date) -> list[Pickup]:
+def pickups(rules: list[Rule], exceptions: list[Exception_], start: date, end: date,
+            fixed: list[FixedPickup] = ()) -> list[Pickup]:
     """Return the pickups falling in ``[start, end]``, sorted by date then label.
 
     Normal occurrences are generated with a margin of :data:`MAX_MOVE` on both
     sides, so that an occurrence moved into the range from outside it is included.
-    Exceptions on dates where the rule has no occurrence are ignored.
+    Exceptions on dates where the rule has no occurrence are ignored. ``fixed``
+    pickups are added as they are when they fall in the range.
     """
     changes = {(exc.rule_id, exc.date): exc for exc in exceptions}
     result = []
@@ -81,4 +96,5 @@ def pickups(rules: list[Rule], exceptions: list[Exception_], start: date, end: d
             if start <= target <= end:
                 result.append(Pickup(target, rule.label, rule.id))
         day += timedelta(days=1)
+    result.extend(Pickup(f.date, f.label, 0, True) for f in fixed if start <= f.date <= end)
     return sorted(result)

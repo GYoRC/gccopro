@@ -123,6 +123,25 @@
     <button>Ajouter</button>
   </form>
 
+  <h3>Collectes à dates fixes (déchets verts…)</h3>
+  <p class="muted small">Sans périodicité. Le logement des administrateurs est aussi notifié.</p>
+  {% if fixed_dates %}
+  <ul class="plain">
+    {% for f in fixed_dates %}
+    <li class="row">
+      <span><strong>{{ f.label }}</strong> — {{ f.date | iso_longue }}</span>
+      <form method="post" action="{{ url_for('admin.delete_trash_date', date_id=f.id) }}">{{ csrf('poubelles') }}<button class="small danger">Supprimer</button></form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <form method="post" action="{{ url_for('admin.add_trash_date') }}" class="grid">
+    {{ csrf('poubelles') }}
+    <label>Type <input name="label" required placeholder="ex. Déchets verts"></label>
+    <label>Date de collecte <input type="date" name="date" required></label>
+    <button>Ajouter</button>
+  </form>
+
   <h3>Exceptions (jours fériés…)</h3>
   {% if exceptions %}
   <ul class="plain">

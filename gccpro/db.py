@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Flask, current_app, g
 
-from .trash import Exception_, Rule
+from .trash import Exception_, FixedPickup, Rule
 
 SCHEMA_DIR = Path(__file__).parent / "schema"
 
@@ -134,6 +134,14 @@ def trash_config() -> tuple[list[Rule], list[Exception_]]:
         for row in db.execute("SELECT * FROM trash_exceptions")
     ]
     return rules, exceptions
+
+
+def fixed_pickups() -> list[FixedPickup]:
+    """Load the fixed-date pickups as :class:`gccpro.trash.FixedPickup` objects."""
+    return [
+        FixedPickup(date.fromisoformat(row["date"]), row["label"])
+        for row in get_db().execute("SELECT * FROM trash_dates ORDER BY date")
+    ]
 
 
 def get_resident(resident_id: int) -> sqlite3.Row | None:
