@@ -1,26 +1,27 @@
-{#- Month grid shared by "Calendrier" and "Mes semaines".
-    Each row is one Monday–Sunday week; tapping it selects the week (?semaine=)
+{% from "_icons.html" import icon %}
+{#- Month grid, year grid, week panel and "my upcoming weeks" block of the calendar page.
+    Each month row is one Monday–Sunday week; tapping it selects the week (?semaine=)
     and shows its details and actions in the panel below the grid. -#}
 
 {% macro month_grid(cal, today) %}
 <section class="month" aria-label="Calendrier de {{ cal.label }}">
   <div class="month-nav">
-    <a class="nav-btn" href="{{ url_for(request.endpoint, mois=cal.prev) }}" aria-label="Mois précédent">‹</a>
+    <a class="nav-btn" href="{{ url_for('calendar.index', mois=cal.prev) }}" aria-label="Mois précédent">{{ icon("left") }}</a>
     <h2>{{ cal.label | capitalize }}</h2>
-    <a class="nav-btn" href="{{ url_for(request.endpoint, mois=cal.next) }}" aria-label="Mois suivant">›</a>
+    <a class="nav-btn" href="{{ url_for('calendar.index', mois=cal.next) }}" aria-label="Mois suivant">{{ icon("right") }}</a>
   </div>
   <div class="dow" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
   {% for w in cal.weeks %}
   {%- set status = 'past' if w.past else ('mine' if w.mine else ('taken' if w.booking else 'free')) -%}
   {%- set pickup_days = w.pickups | map(attribute='date') | list -%}
   <a class="mweek {{ status }}{% if cal.selected and cal.selected.monday == w.monday %} selected{% endif %}{% if w.current %} current{% endif %}"
-     href="{{ url_for(request.endpoint, mois=cal.month, semaine=w.monday.isoformat()) }}#semaine-choisie"
+     href="{{ url_for('calendar.index', mois=cal.month, semaine=w.monday.isoformat()) }}#semaine-choisie"
      aria-label="Semaine {{ w.monday | semaine }}">
     <span class="days">
       {%- for d in w.days %}
       <span class="day{% if d.month != cal.year_month[1] %} out{% endif %}{% if d == today %} today{% endif %}">
         <span class="num">{{ d.day }}</span>
-        <span class="marks">{% if d in pickup_days %}🗑️{% endif %}{% if d in w.events %}📅{% endif %}</span>
+        <span class="marks">{% if d in pickup_days %}<span title="Collecte des poubelles">{{ icon("trash") }}</span>{% endif %}{% if d in w.events %}<span title="Événement">{{ icon("calendar") }}</span>{% endif %}</span>
       </span>
       {%- endfor %}
     </span>
@@ -32,7 +33,36 @@
     </span>
   </a>
   {% endfor %}
-  <p class="legend muted small">🗑️ collecte (sortir la veille au soir) · 📅 événement · touchez une semaine pour la réserver</p>
+  <p class="legend muted small">{{ icon("trash") }}collecte (sortir la veille au soir) · {{ icon("calendar") }}événement · touchez une semaine pour la réserver</p>
+</section>
+{% endmacro %}
+
+{#- Year view: twelve mini-months; each week row is coloured by its status and links to the month view. -#}
+{% macro year_grid(year, today) %}
+<section class="month" aria-label="Année {{ year.year }}">
+  <div class="month-nav">
+    <a class="nav-btn" href="{{ url_for('calendar.index', vue='annee', annee=year.prev) }}" aria-label="Année précédente">{{ icon("left") }}</a>
+    <h2>{{ year.year }}</h2>
+    <a class="nav-btn" href="{{ url_for('calendar.index', vue='annee', annee=year.next) }}" aria-label="Année suivante">{{ icon("right") }}</a>
+  </div>
+  <div class="year">
+    {% for m in year.months %}
+    <div class="mini">
+      <h3><a href="{{ url_for('calendar.index', mois=m.key) }}">{{ m.label | capitalize }}</a></h3>
+      {% for w in m.weeks %}
+      {%- set status = 'past' if w.past else ('mine' if w.mine else ('taken' if w.booking else 'free')) -%}
+      <a class="mweek mini-week {{ status }}{% if w.current %} current{% endif %}"
+         href="{{ url_for('calendar.index', mois=m.key, semaine=w.monday.isoformat()) }}#semaine-choisie"
+         aria-label="Semaine {{ w.monday | semaine }}">
+        {%- for d in w.days %}<span class="day{% if d.month != m.number %} out{% endif %}{% if d == today %} today{% endif %}">{{ d.day }}</span>{% endfor -%}
+      </a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="legend muted small">
+    <span class="swatch free"></span> libre · <span class="swatch mine"></span> vous · <span class="swatch taken"></span> prise · touchez une semaine pour la détailler
+  </p>
 </section>
 {% endmacro %}
 
@@ -47,11 +77,11 @@
   </p>
   {% if w.pickups %}
   <ul class="pickups">
-    {% for p in w.pickups %}<li>🗑️ {{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
+    {% for p in w.pickups %}<li>{{ icon("trash") }}{{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
   </ul>
   {% endif %}
   {% for day, titles in w.events.items() %}
-    {% for t in titles %}<p>📅 {{ day | date_courte }} : {{ t }} <a href="{{ url_for('info.index') }}">détails</a></p>{% endfor %}
+    {% for t in titles %}<p>{{ icon("calendar") }}{{ day | date_courte }} : {{ t }} <a href="{{ url_for('info.index') }}">détails</a></p>{% endfor %}
   {% endfor %}
   <div class="actions">
     {% if w.can_book_1 %}
@@ -59,7 +89,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
       <input type="hidden" name="count" value="1">
-      <button>Réserver cette semaine</button>
+      <button>{{ icon("plus") }}Réserver cette semaine</button>
     </form>
     {% endif %}
     {% if w.can_book_2 %}
@@ -67,14 +97,14 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
       <input type="hidden" name="count" value="2">
-      <button class="secondary">Réserver 2 semaines</button>
+      <button class="secondary">{{ icon("plus") }}Réserver 2 semaines</button>
     </form>
     {% endif %}
     {% if w.can_cancel %}
     <form method="post" action="{{ url_for('account.cancel') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
-      <button class="danger">Annuler ma semaine</button>
+      <button class="danger">{{ icon("x") }}Annuler ma semaine</button>
     </form>
     {% elif w.mine and not w.past %}
     <p class="muted small">Annulation impossible depuis le {{ w.cancel_deadline | date_courte }}. Contactez l’administrateur.</p>
@@ -83,5 +113,32 @@
     <p class="muted small">Cette semaine ne peut pas être réservée (plus de 2 semaines d’affilée, ou au-delà de la période ouverte).</p>
     {% endif %}
   </div>
+</section>
+{% endmacro %}
+
+{#- The resident's own upcoming weeks with the cancel buttons (shown under every view). -#}
+{% macro my_weeks(mine) %}
+<section class="card">
+  <h2>{{ icon("check") }}Mes prochaines semaines</h2>
+  {% if mine %}
+  <ul class="plain">
+    {% for w in mine %}
+    <li class="row">
+      <span>{{ w.monday | semaine }}</span>
+      {% if w.can_cancel %}
+      <form method="post" action="{{ url_for('account.cancel') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
+        <button class="danger small">{{ icon("x") }}Annuler</button>
+      </form>
+      {% else %}
+      <span class="muted small">Annulation impossible depuis le {{ w.deadline | date_courte }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">Vous n’avez aucune semaine réservée. Touchez une semaine libre du calendrier pour la réserver.</p>
+  {% endif %}
 </section>
 {% endmacro %}

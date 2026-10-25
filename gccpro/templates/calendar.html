@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_month.html" import month_grid, week_panel with context %}
+{% from "_month.html" import month_grid, year_grid, week_panel, my_weeks with context %}
+{% from "_icons.html" import icon %}
 {% block title %}Calendrier{% endblock %}
 {% block content %}
 <h1>Calendrier d’entretien</h1>
@@ -7,11 +8,14 @@
   sort les poubelles et nettoie le parking. Vous pouvez réserver 1 ou 2 semaines d’affilée.</p>
 
 <nav class="switch" aria-label="Affichage">
-  <a href="{{ url_for('calendar.index') }}"{% if view == 'mois' %} aria-current="page"{% endif %}>Mois</a>
-  <a href="{{ url_for('calendar.index', vue='liste') }}"{% if view == 'liste' %} aria-current="page"{% endif %}>Liste</a>
+  <a href="{{ url_for('calendar.index', vue='annee') }}"{% if view == 'annee' %} aria-current="page"{% endif %}>{{ icon("year") }}Année</a>
+  <a href="{{ url_for('calendar.index') }}"{% if view == 'mois' %} aria-current="page"{% endif %}>{{ icon("calendar") }}Mois</a>
+  <a href="{{ url_for('calendar.index', vue='liste') }}"{% if view == 'liste' %} aria-current="page"{% endif %}>{{ icon("list") }}Liste</a>
 </nav>
 
-{% if view == 'mois' %}
+{% if view == 'annee' %}
+  {{ year_grid(year, today) }}
+{% elif view == 'mois' %}
   {{ month_grid(cal, today) }}
   {% if cal.selected %}{{ week_panel(cal.selected) }}{% endif %}
 {% else %}
@@ -28,7 +32,7 @@
     </div>
     {% if row.pickups %}
       <ul class="pickups">
-      {% for p in row.pickups %}<li>🗑️ {{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
+      {% for p in row.pickups %}<li>{{ icon("trash") }}{{ p.date | date_courte }} : {{ p.label }} <span class="muted">(sortir la veille au soir)</span></li>{% endfor %}
       </ul>
     {% endif %}
     {% if row.can_book_1 or row.can_book_2 %}
@@ -38,7 +42,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="week_start" value="{{ row.monday.isoformat() }}">
           <input type="hidden" name="count" value="1">
-          <button>Réserver cette semaine</button>
+          <button>{{ icon("plus") }}Réserver cette semaine</button>
         </form>
         {% endif %}
         {% if row.can_book_2 %}
@@ -46,7 +50,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="week_start" value="{{ row.monday.isoformat() }}">
           <input type="hidden" name="count" value="2">
-          <button class="secondary">Réserver 2 semaines</button>
+          <button class="secondary">{{ icon("plus") }}Réserver 2 semaines</button>
         </form>
         {% endif %}
       </div>
@@ -55,4 +59,6 @@
 {% endfor %}
 </ol>
 {% endif %}
+
+{{ my_weeks(mine) }}
 {% endblock %}

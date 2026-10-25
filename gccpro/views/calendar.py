@@ -1,7 +1,9 @@
 """Calendar page: the upcoming weeks, who is on duty, and booking.
 
-Two views share the same per-week data (:func:`week_infos`): a month grid, where
-each row is one Monday-to-Sunday week, and the original list of upcoming weeks.
+Three views share the same per-week data (:func:`week_infos`): a year of twelve
+mini-months, a month grid (default) where each row is one Monday-to-Sunday week,
+and the list of upcoming weeks. The resident's own upcoming weeks (with the
+cancel buttons) are shown under every view.
 """
 
 import sqlite3
@@ -137,12 +139,67 @@ def build_month(today: date, resident_id: int) -> dict:
     }
 
 
+def parse_year(value: str | None, today: date) -> int:
+    """Parse the ``annee`` query parameter; fall back to today's year."""
+    try:
+        year = int(value or "")
+        date(year, 1, 1)  # validates the range
+        return year
+    except ValueError:
+        return today.year
+
+
+def build_year(today: date, resident_id: int) -> dict:
+    """Build the year-view context from the ``annee`` query parameter.
+
+    Returns:
+        A dict with ``year``, ``prev``, ``next`` and ``months``: twelve dicts with
+        ``number``, ``key`` (YYYY-MM), ``label`` and ``weeks`` (from :func:`week_infos`).
+    """
+    year = parse_year(request.args.get("annee"), today)
+    by_month = {month: month_mondays(year, month) for month in range(1, 13)}
+    # One query round for the whole year; weeks shared by two months are reused.
+    all_mondays = sorted({monday for mondays in by_month.values() for monday in mondays})
+    infos = {info["monday"]: info for info in week_infos(all_mondays, today, resident_id)}
+    months = [{
+        "number": month,
+        "key": f"{year:04d}-{month:02d}",
+        "label": frdates.MOIS[month - 1],
+        "weeks": [infos[monday] for monday in mondays],
+    } for month, mondays in by_month.items()]
+    return {"year": year, "prev": year - 1, "next": year + 1, "months": months}
+
+
+def my_upcoming(today: date, resident_id: int) -> list[dict]:
+    """Return the resident's current and future weeks with their cancel status.
+
+    Each dict has ``monday``, ``can_cancel`` and ``deadline`` (last cancel day rule).
+    """
+    deadline_days = get_setting("cancel_deadline_days")
+    rows = get_db().execute(
+        "SELECT week_start FROM bookings WHERE resident_id = ? AND week_start >= ?"
+        " ORDER BY week_start",
+        (resident_id, rules.monday_of(today).isoformat()),
+    ).fetchall()
+    weeks = []
+    for row in rows:
+        monday = date.fromisoformat(row["week_start"])
+        weeks.append({
+            "monday": monday,
+            "can_cancel": rules.can_cancel(monday, today, deadline_days),
+            "deadline": rules.cancel_deadline(monday, deadline_days),
+        })
+    return weeks
+
+
 @bp.get("/")
 @login_required
 def index():
-    """Show the calendar, as a month grid (default) or as a list (``?vue=liste``)."""
+    """Show the calendar as a month grid (default), a year, or a list (``?vue=``)."""
     today = clock.today()
-    if request.args.get("vue") == "liste":
+    view = request.args.get("vue")
+    mine = my_upcoming(today, g.user["id"])
+    if view == "liste":
         first = rules.monday_of(today)
         last = rules.last_bookable_week(today, get_setting("horizon_weeks"))
         mondays = []
@@ -150,9 +207,12 @@ def index():
         while week <= last:
             mondays.append(week)
             week += rules.WEEK
-        return render_template("calendar.html", view="liste",
+        return render_template("calendar.html", view="liste", mine=mine,
                                rows=week_infos(mondays, today, g.user["id"]))
-    return render_template("calendar.html", view="mois", today=today,
+    if view == "annee":
+        return render_template("calendar.html", view="annee", today=today, mine=mine,
+                               year=build_year(today, g.user["id"]))
+    return render_template("calendar.html", view="mois", today=today, mine=mine,
                            cal=build_month(today, g.user["id"]))
 
 

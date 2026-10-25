@@ -1,6 +1,6 @@
 /**
  * @file Page script: registers the service worker and drives the notification
- * panel of "Mes semaines" (#push-panel). No dependencies, no build step.
+ * panel of the "Profil" page (#push-panel). No dependencies, no build step.
  */
 
 /**

@@ -1,4 +1,4 @@
-<!doctype html>
+{% from "_icons.html" import icon %}<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
@@ -18,17 +18,13 @@
       <span class="brand-name">{{ config.SITE_SHORT_NAME }}</span>
       <span class="brand-tagline">{{ config.SITE_TAGLINE }}</span>
     </a>
-    <button type="button" id="theme-toggle" class="theme-toggle">Thème</button>
+    <button type="button" id="theme-toggle" class="theme-toggle">{{ icon("sun") }}<span id="theme-label">Thème</span></button>
     {% if current_user %}
     <nav>
-      <a href="{{ url_for('calendar.index') }}">Calendrier</a>
-      <a href="{{ url_for('account.my_weeks') }}">Mes semaines</a>
-      <a href="{{ url_for('info.index') }}">Infos</a>
-      {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.index') }}">Admin</a>{% endif %}
-      <form method="post" action="{{ url_for('account.logout') }}" class="inline">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="link">Déconnexion</button>
-      </form>
+      <a href="{{ url_for('calendar.index') }}"{% if request.endpoint == 'calendar.index' %} aria-current="page"{% endif %}>{{ icon("calendar") }}Calendrier</a>
+      <a href="{{ url_for('info.index') }}"{% if request.endpoint == 'info.index' %} aria-current="page"{% endif %}>{{ icon("info") }}Infos</a>
+      {% if current_user.role == 'admin' %}<a href="{{ url_for('admin.index') }}"{% if request.blueprint == 'admin' %} aria-current="page"{% endif %}>{{ icon("shield") }}Admin</a>{% endif %}
+      <a href="{{ url_for('account.profile') }}"{% if request.endpoint == 'account.profile' %} aria-current="page"{% endif %}>{{ icon("user") }}Profil</a>
     </nav>
     {% endif %}
   </header>

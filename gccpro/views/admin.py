@@ -446,5 +446,5 @@ def test_notification():
     if count:
         flash(f"Notification envoyée à {count} appareil(s).", "ok")
     else:
-        flash("Aucun appareil n’a reçu la notification. Activez-les dans « Mes semaines ».", "erreur")
+        flash("Aucun appareil n’a reçu la notification. Activez-les dans « Profil ».", "erreur")
     return _back()

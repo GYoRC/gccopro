@@ -13,8 +13,10 @@ The interface is entirely in French.
 
 - **Calendar**: a month view where each row is one Monday–Sunday week, plus a list view. Residents
   book 1 or 2 weeks at a time, never more than 2 in a row, up to a configurable horizon (26 weeks by default).
-- **My weeks** (*Mes semaines*): the resident's own weeks, cancellation up to a deadline (7 days
-  before the week by default), and the switch for push notifications on each device.
+- **Calendar**: year, month and list views; under them, the resident's own upcoming weeks with
+  cancellation up to a deadline (7 days before the week by default).
+- **Profile** (*Profil*): the resident's details, the switch for push notifications on each device,
+  and logout.
 - **Trash reminders**: a push notification at 18:00 the day before each pickup, sent to whoever is on
   duty that evening. It falls back to email for residents without notifications.
 - **Unbooked weeks**: highlighted in the calendar. Residents are notified and the admins are emailed

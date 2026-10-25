@@ -40,7 +40,7 @@
 
     /** Refresh the visible label and the accessible name. */
     function render() {
-      button.textContent = "Thème : " + LABELS[mode];
+      button.querySelector("#theme-label").textContent = LABELS[mode];
       button.setAttribute("aria-label", "Changer de thème (actuel : " + LABELS[mode] + ")");
     }
 

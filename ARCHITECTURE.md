@@ -98,7 +98,6 @@ Things worth noticing:
 
 - **Leaves** (import nothing from the package): `frdates`, `trash`, `aesgcm`, `mail`, `clock`, `config`, `views/__init__`.
 - **`db.py`** is the hub. It is imported by almost everything, and imports only `trash` (to build `Rule` / `Exception_` objects in `trash_config()`).
-- **`views/account.py` imports `views/calendar.py`** (`build_month`) to reuse the month grid on "my weeks".
 - **`cli.py` and `reminders.py`** are not imported by views. They can run with no HTTP request, only an app context.
 - Nothing imports `__init__.py` except the entry points and tests, so `create_app` is the single wiring point.
 
@@ -134,8 +133,8 @@ Things worth noticing:
 
 | Blueprint | Routes | Notes |
 |-----------|--------|-------|
-| `calendar.py` | `GET /`, `POST /reserver` | Month grid, `week_infos`, `build_month`, booking |
-| `account.py` | `/connexion`, `/connexion/<token>` (GET and POST), `POST /deconnexion`, `GET /mes-semaines`, `POST /annuler` | Login flow, my weeks, cancel |
+| `calendar.py` | `GET /`, `POST /reserver` | Year / month / list views, `week_infos`, `build_month`, `build_year`, `my_upcoming`, booking |
+| `account.py` | `/connexion`, `/connexion/<token>` (GET and POST), `POST /deconnexion`, `GET /profil`, `GET /mes-semaines` (redirects to `/`), `POST /annuler` | Login flow, profile (details, push, logout), cancel |
 | `info.py` | `GET /infos` | Announcements and the AG date |
 | `admin.py` | `GET /admin` and POST actions (residents, week assignment, trash rules and exceptions, announcements, settings, test notification) | Every route wrapped in `admin_required` |
 | `pwa.py` | `/sw.js`, `/manifest.webmanifest`, `POST /push/abonnement`, `POST /push/desabonnement` | Service worker and push subscription |

@@ -1,6 +1,4 @@
-"""Login by link (email or WhatsApp via an admin), logout, and the resident's own weeks page."""
-
-from datetime import date
+"""Login by link (email or WhatsApp via an admin), logout, and the resident's profile page."""
 
 from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template,
                    request, session, url_for)
@@ -9,7 +7,6 @@ from .. import auth, clock, frdates, phones, push, rules
 from ..auth import login_required
 from ..db import get_db, get_setting
 from . import parse_date, safe_back
-from .calendar import build_month
 
 bp = Blueprint("account", __name__)
 
@@ -82,33 +79,24 @@ def logout():
     return redirect(url_for(".login"))
 
 
+@bp.get("/profil")
+@login_required
+def profile():
+    """Show the resident's details, the notification settings and the logout button."""
+    vapid_key = current_app.config["VAPID_PRIVATE_KEY"]
+    phone = g.user["phone"]
+    return render_template(
+        "profile.html",
+        phone=phones.display(phone) if phone else "",
+        vapid_public_key=push.vapid_public_key(vapid_key) if vapid_key else "",
+    )
+
+
 @bp.get("/mes-semaines")
 @login_required
 def my_weeks():
-    """List the resident's upcoming weeks and the notification settings."""
-    today = clock.today()
-    deadline_days = get_setting("cancel_deadline_days")
-    rows = get_db().execute(
-        "SELECT week_start FROM bookings WHERE resident_id = ? AND week_start >= ?"
-        " ORDER BY week_start",
-        (g.user["id"], rules.monday_of(today).isoformat()),
-    ).fetchall()
-    weeks = []
-    for row in rows:
-        monday = date.fromisoformat(row["week_start"])
-        weeks.append({
-            "monday": monday,
-            "can_cancel": rules.can_cancel(monday, today, deadline_days),
-            "deadline": rules.cancel_deadline(monday, deadline_days),
-        })
-    vapid_key = current_app.config["VAPID_PRIVATE_KEY"]
-    return render_template(
-        "my_weeks.html",
-        weeks=weeks,
-        today=today,
-        cal=build_month(today, g.user["id"]),
-        vapid_public_key=push.vapid_public_key(vapid_key) if vapid_key else "",
-    )
+    """Old address of the page, now merged into the calendar; kept for old links."""
+    return redirect(url_for("calendar.index"))
 
 
 @bp.post("/annuler")
@@ -126,8 +114,8 @@ def cancel():
         abort(403)
     if not is_admin and not rules.can_cancel(monday, clock.today(), get_setting("cancel_deadline_days")):
         flash("Il est trop tard pour annuler cette semaine. Contactez l’administrateur.", "erreur")
-        return redirect(safe_back(url_for(".my_weeks")))
+        return redirect(safe_back(url_for("calendar.index")))
     with db:
         db.execute("DELETE FROM bookings WHERE week_start = ?", (monday.isoformat(),))
     flash(f"Semaine {frdates.semaine(monday)} annulée.", "ok")
-    return redirect(safe_back(url_for(".my_weeks")))
+    return redirect(safe_back(url_for("calendar.index")))

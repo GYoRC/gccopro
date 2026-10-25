@@ -51,9 +51,9 @@ def outbox(app):
 def csrf(client) -> str:
     """Return the client session's CSRF token (rendering a page with a form creates it).
 
-    ``/connexion`` redirects once logged in, so ``/`` is tried as well.
+    ``/connexion`` redirects once logged in, so the profile page (which has the logout form) is tried as well.
     """
-    for url in ("/connexion", "/"):
+    for url in ("/connexion", "/profil"):
         client.get(url)
         with client.session_transaction() as session:
             if "csrf" in session:

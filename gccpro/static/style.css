@@ -170,8 +170,19 @@ button[hidden] { display: none; }
 .pickups { list-style: none; padding: 0; margin: 0.4rem 0 0; font-size: 0.95rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
 
+/* Icons: inline SVG sized to the text, coloured by the surrounding text. */
+.icon { width: 1.1em; height: 1.1em; flex: none; vertical-align: -0.18em; margin-right: 0.35em; }
+.theme-toggle .icon, .marks .icon, .nav-btn .icon { margin-right: 0; }
+button, a.button, .switch a, .top nav a { display: inline-flex; align-items: center; justify-content: center; }
+h2 .icon { margin-right: 0.45em; color: var(--accent); }
+.top nav a { padding: 0.15rem 0.1rem; border-bottom: 2px solid transparent; }
+.top nav a[aria-current="page"] { border-bottom-color: currentColor; font-weight: 600; }
+.details li { display: flex; align-items: center; padding: 0.2rem 0; }
+.details .icon { color: var(--muted); }
+
 /* Theme toggle in the header */
 .theme-toggle {
+  display: inline-flex; align-items: center; gap: 0.35rem;
   font-size: 0.8rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 999px;
   background: transparent; color: var(--head-text); border: 1px solid currentColor;
 }
@@ -195,8 +206,8 @@ button[hidden] { display: none; }
   display: block; margin-top: 0.35rem; padding: 0.3rem 0.25rem 0.35rem;
   border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-decoration: none;
 }
-.mweek.free { background: var(--free); border-color: var(--free-line); }
-.mweek.mine { background: var(--mine); border-color: var(--blue); }
+.mweek.free, .swatch.free { background: var(--free); border-color: var(--free-line); }
+.mweek.mine, .swatch.mine { background: var(--mine); border-color: var(--blue); }
 .mweek.past { opacity: 0.55; }
 .mweek.current { border-width: 2px; }
 .mweek.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
@@ -205,7 +216,7 @@ button[hidden] { display: none; }
 .day .num { font-weight: 600; line-height: 1.6; min-width: 1.6rem; border-radius: 999px; }
 .day.out .num { color: var(--muted); font-weight: 400; }
 .day.today .num { background: var(--accent); color: var(--accent-text); }
-.day .marks { font-size: 0.8rem; line-height: 1; }
+.day .marks { display: flex; gap: 1px; font-size: 0.7rem; line-height: 1; }
 .owner { display: block; text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 0.15rem; }
 .mweek.mine .owner { color: var(--blue); }
 .mweek.free .owner { color: var(--text); }
@@ -225,3 +236,14 @@ td.buttons { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 tr.inactive td { color: var(--muted); }
 tr.free td:first-child { font-weight: 600; }
 details.help { margin-top: 1rem; color: var(--muted); }
+
+/* Year view: twelve mini-months, one thin row per week. */
+.year { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); }
+.mini h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
+.mini h3 a { text-decoration: none; }
+.mini-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 2px; padding: 1px 2px; border-radius: 6px; font-size: 0.7rem; text-align: center; }
+.mini-week .day { display: block; min-height: 0; }
+.mini-week .day.out { visibility: hidden; }
+.mini-week .day.today { background: var(--accent); color: var(--accent-text); border-radius: 999px; }
+.swatch { display: inline-block; width: 0.8rem; height: 0.8rem; border: 1px solid var(--line); border-radius: 3px; vertical-align: -0.1em; }
+.swatch.taken { background: var(--card); }

@@ -17,7 +17,7 @@ def book(client, week: str, count: int = 1):
 
 
 def test_pages_require_login(client):
-    for url in ("/", "/mes-semaines", "/infos", "/admin"):
+    for url in ("/", "/profil", "/infos", "/admin"):
         response = client.get(url)
         assert response.status_code == 302 and "/connexion" in response.headers["Location"]
 
@@ -68,8 +68,8 @@ def test_booking_and_consecutive_limit(client, outbox):
     assert "réservées. Merci" in page
     page = book(client, "2026-11-09").get_data(as_text=True)
     assert "consécutives" in page
-    page = client.get("/mes-semaines").get_data(as_text=True)
-    assert "du 26 octobre au 1er novembre 2026" in page and "du 2 au 8 novembre 2026" in page
+    page = client.get("/").get_data(as_text=True)
+    assert "Mes prochaines semaines" in page and "du 26 octobre au 1er novembre 2026" in page and "du 2 au 8 novembre 2026" in page
 
 
 def test_cannot_book_someone_elses_week(client, app, outbox):
@@ -200,11 +200,20 @@ def test_month_view_tolerates_bad_parameters(client, outbox):
     assert client.get("/?vue=liste").status_code == 200
 
 
-def test_my_weeks_has_month_grid(client, outbox):
+def test_year_view(client, outbox):
     login(client, outbox, "alice@test.fr")
     book(client, NEXT_MONDAY)
-    page = client.get("/mes-semaines?mois=2026-10").get_data(as_text=True)
-    assert "Octobre 2026" in page and "mweek mine" in page
+    page = client.get("/?vue=annee").get_data(as_text=True)
+    assert "Novembre" in page and "mini-week mine" in page and "Mes prochaines semaines" in page
+    assert client.get("/?vue=annee&annee=nope").status_code == 200
+    assert "2027" in client.get("/?vue=annee&annee=2027").get_data(as_text=True)
+
+
+def test_profile_page_and_legacy_url(client, outbox):
+    login(client, outbox, "alice@test.fr")
+    page = client.get("/profil").get_data(as_text=True)
+    assert "alice@test.fr" in page and 'id="push-panel"' in page and "Se déconnecter" in page
+    assert client.get("/mes-semaines").headers["Location"] == "/"
 
 
 def test_back_redirect_ignores_other_sites(client, outbox):
