@@ -1,6 +1,7 @@
-/* GCCopro – single stylesheet, mobile first, follows the system light/dark theme. */
+/* Le 53 Bourrassol – single stylesheet, mobile first, follows the system light/dark theme. */
 
 :root {
+  /* Modern blue palette; --blue marks "my week", --head-* style the header. */
   --bg: #f6f7f9;
   --card: #ffffff;
   --text: #1d2430;
@@ -8,6 +9,9 @@
   --line: #dde2e8;
   --accent: #2f5d8a;
   --accent-text: #ffffff;
+  --blue: #2f5d8a;
+  --head-bg: #2f5d8a;
+  --head-text: #ffffff;
   --mine: #e6f0fa;
   --free: #fff6e0;
   --free-line: #e8b44a;
@@ -19,8 +23,9 @@
   color-scheme: light;
 }
 
+/* Dark theme: follows the system unless the user forced light; or forced dark via the header button. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12161c;
     --card: #1b2129;
     --text: #e6eaef;
@@ -28,6 +33,9 @@
     --line: #2c3540;
     --accent: #6fa3d8;
     --accent-text: #0d1117;
+    --blue: #6fa3d8;
+    --head-bg: #6fa3d8;
+    --head-text: #0d1117;
     --mine: #1d3047;
     --free: #3a2f14;
     --free-line: #c9962e;
@@ -38,6 +46,28 @@
     --danger: #f07167;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #12161c;
+  --card: #1b2129;
+  --text: #e6eaef;
+  --muted: #9aa5b3;
+  --line: #2c3540;
+  --accent: #6fa3d8;
+  --accent-text: #0d1117;
+  --blue: #6fa3d8;
+  --head-bg: #6fa3d8;
+  --head-text: #0d1117;
+  --mine: #1d3047;
+  --free: #3a2f14;
+  --free-line: #c9962e;
+  --ok: #163222;
+  --ok-text: #8fdca8;
+  --err: #3b1717;
+  --err-text: #f4a3a3;
+  --danger: #f07167;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -58,9 +88,9 @@ h3 { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
 .top {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
   padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 1rem 0.75rem;
-  background: var(--accent); color: var(--accent-text);
+  background-color: var(--head-bg); color: var(--head-text);
 }
-.top a, .top .link { color: var(--accent-text); text-decoration: none; }
+.top a, .top .link { color: var(--head-text); text-decoration: none; }
 .brand { display: flex; flex-direction: column; line-height: 1.1; }
 .brand-name { font-weight: 800; font-size: 1.35rem; letter-spacing: 0.01em; }
 .brand-tagline { font-size: 0.8rem; font-style: italic; opacity: 0.85; }
@@ -129,16 +159,22 @@ button[hidden] { display: none; }
 .weeks { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
 .week { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 1rem; }
 .week.free { background: var(--free); border-color: var(--free-line); }
-.week.mine { background: var(--mine); border-color: var(--accent); }
+.week.mine { background: var(--mine); border-color: var(--blue); }
 .week.current { border-width: 2px; }
 .week-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 1rem; font-weight: 600; }
-.who { color: var(--accent); }
+.who { color: var(--blue); }
 .badge {
   display: inline-block; padding: 0.05rem 0.55rem; border-radius: 999px; font-size: 0.85rem;
   border: 1px solid var(--free-line); font-weight: 600;
 }
 .pickups { list-style: none; padding: 0; margin: 0.4rem 0 0; font-size: 0.95rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
+
+/* Theme toggle in the header */
+.theme-toggle {
+  font-size: 0.8rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: transparent; color: var(--head-text); border: 1px solid currentColor;
+}
 
 /* View switch (Mois / Liste) */
 .switch { display: inline-flex; border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
@@ -160,7 +196,7 @@ button[hidden] { display: none; }
   border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-decoration: none;
 }
 .mweek.free { background: var(--free); border-color: var(--free-line); }
-.mweek.mine { background: var(--mine); border-color: var(--accent); }
+.mweek.mine { background: var(--mine); border-color: var(--blue); }
 .mweek.past { opacity: 0.55; }
 .mweek.current { border-width: 2px; }
 .mweek.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
@@ -171,7 +207,7 @@ button[hidden] { display: none; }
 .day.today .num { background: var(--accent); color: var(--accent-text); }
 .day .marks { font-size: 0.8rem; line-height: 1; }
 .owner { display: block; text-align: center; font-size: 0.85rem; font-weight: 600; margin-top: 0.15rem; }
-.mweek.mine .owner { color: var(--accent); }
+.mweek.mine .owner { color: var(--blue); }
 .mweek.free .owner { color: var(--text); }
 .legend { margin: 0.6rem 0 0; }
 .week-panel { scroll-margin-top: 1rem; }

@@ -9,6 +9,7 @@
   <link rel="icon" href="{{ url_for('static', filename='icon-192.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-192.png') }}">
   <meta name="theme-color" content="#2f5d8a">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
@@ -17,6 +18,7 @@
       <span class="brand-name">{{ config.SITE_SHORT_NAME }}</span>
       <span class="brand-tagline">{{ config.SITE_TAGLINE }}</span>
     </a>
+    <button type="button" id="theme-toggle" class="theme-toggle">Thème</button>
     {% if current_user %}
     <nav>
       <a href="{{ url_for('calendar.index') }}">Calendrier</a>
