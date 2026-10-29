@@ -16,6 +16,7 @@ gccpro/                  repo root
 │   ├── schema/          NNN_*.sql migrations (applied at startup)
 │   ├── auth.py          login tokens, session, CSRF, rate limit, decorators
 │   ├── mail.py          send_mail (SMTP, console or in-memory)
+│   ├── background.py    run slow work (login mail, admin alerts) in a daemon thread
 │   ├── clock.py         today() / utcnow() in Europe/Paris
 │   ├── rules.py         booking rules (pure)
 │   ├── trash.py         trash pickup expansion (pure)
@@ -126,6 +127,7 @@ Things worth noticing:
   - Signed cookie session, per-email/IP `RateLimiter`, CSRF check on every POST.
   - `login_required` and `admin_required` decorators, and `init_app` which registers the before-request hooks.
 - **[mail.py](gccpro/mail.py)**: `send_mail` with backends chosen by config: SMTP in production, console in dev, an in-memory list in tests.
+- **[background.py](gccpro/background.py)**: `run(job)` executes a job in an app context, in a daemon thread (inline when `TESTING`), logging errors. The public login form uses it so response time and page are the same for known and unknown addresses; jobs get plain values, never request rows.
 - **[push.py](gccpro/push.py)**: VAPID signing (`ecdsa`), RFC 8291 payload encryption (HKDF + `aesgcm`), `deliver` to one subscription and `send_to_resident`, which reads `push_subscriptions`.
 - **[reminders.py](gccpro/reminders.py)**: `run(today, dry_run)` computes pickups (`trash`), finds the recipient (`rules.reminder_recipient`) and sends push, falling back to email. `notification_log` makes it idempotent.
 

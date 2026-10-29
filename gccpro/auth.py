@@ -7,6 +7,7 @@ phone number, through an admin who forwards them on WhatsApp.
 import functools
 import hashlib
 import hmac
+import logging
 import secrets
 import sqlite3
 import time
@@ -15,8 +16,10 @@ from datetime import timedelta
 
 from flask import Flask, abort, current_app, g, redirect, request, session, url_for
 
-from . import clock, mail, phones, push
+from . import background, clock, mail, phones, push
 from .db import get_db
+
+log = logging.getLogger(__name__)
 
 #: How long a login link sent by email stays valid.
 TOKEN_LIFETIME = timedelta(minutes=15)
@@ -69,8 +72,15 @@ def login_url(token: str) -> str:
     return current_app.config["BASE_URL"].rstrip("/") + url_for("account.login_confirm", token=token)
 
 
-def send_login_link(resident: sqlite3.Row) -> bool:
+def send_login_link(resident: sqlite3.Row, quiet: bool = False) -> bool:
     """Email a fresh login link to ``resident`` (a residents row).
+
+    Args:
+        resident: A residents row.
+        quiet: For the public login form. The token is still created in the request,
+            but the email is sent in the background and a failure is only logged, so
+            the response looks the same for known and unknown addresses. Admin
+            callers leave it False and see send errors.
 
     Returns:
         False, without creating a token, when the resident has no email address.
@@ -78,14 +88,17 @@ def send_login_link(resident: sqlite3.Row) -> bool:
     if not resident["email"]:
         return False
     link = login_url(create_login_token(resident["id"]))
-    mail.send_mail(
-        resident["email"],
-        f"Votre lien de connexion – {current_app.config['SITE_NAME']}",
+    to, subject = resident["email"], f"Votre lien de connexion – {current_app.config['SITE_NAME']}"
+    body = (
         f"Bonjour {resident['name']},\n\n"
         f"Voici votre lien de connexion au calendrier d’entretien de l’immeuble "
         f"(valable 15 minutes, utilisable une seule fois) :\n\n{link}\n\n"
-        "Si vous n’avez pas demandé ce lien, vous pouvez ignorer ce message.\n",
+        "Si vous n’avez pas demandé ce lien, vous pouvez ignorer ce message.\n"
     )
+    if quiet:
+        background.run(lambda: mail.send_mail(to, subject, body))
+    else:
+        mail.send_mail(to, subject, body)
     return True
 
 
@@ -134,15 +147,25 @@ def request_whatsapp_link(resident: sqlite3.Row) -> None:
     who = resident["name"] + (f" ({resident['apartment']})" if resident["apartment"] else "")
     text = f"{who} demande un lien de connexion par WhatsApp."
     admin_url = current_app.config["BASE_URL"].rstrip("/") + url_for("admin.index") + "#connexions"
-    admins = db.execute("SELECT * FROM residents WHERE role = 'admin' AND active = 1").fetchall()
+    subject = f"Demande de connexion – {current_app.config['SITE_NAME']}"
+    # Slow network calls run in the background so the response time does not depend on
+    # whether the number is known; one failing admin must not stop the others.
+    background.run(lambda: _alert_admins(text, subject, admin_url))
+
+
+def _alert_admins(text: str, subject: str, admin_url: str) -> None:
+    """Push, and email when possible, every active admin about a phone login request."""
+    admins = get_db().execute("SELECT * FROM residents WHERE role = 'admin' AND active = 1").fetchall()
     for admin in admins:
-        push.send_to_resident(admin["id"], "Demande de connexion", text, "/admin#connexions")
-        if admin["email"]:
-            mail.send_mail(
-                admin["email"],
-                f"Demande de connexion – {current_app.config['SITE_NAME']}",
-                f"{text}\n\nRépondez depuis l’administration (bouton WhatsApp) : {admin_url}\n",
-            )
+        try:
+            push.send_to_resident(admin["id"], "Demande de connexion", text, "/admin#connexions")
+            if admin["email"]:
+                mail.send_mail(
+                    admin["email"], subject,
+                    f"{text}\n\nRépondez depuis l’administration (bouton WhatsApp) : {admin_url}\n",
+                )
+        except Exception:
+            log.exception("could not alert admin %s", admin["id"])
 
 
 def log_in(resident_id: int) -> None:

@@ -43,7 +43,7 @@ def login():
         ).fetchone()
         if resident is not None:
             if kind == "email":
-                auth.send_login_link(resident)
+                auth.send_login_link(resident, quiet=True)
             else:
                 auth.request_whatsapp_link(resident)
     shown = value if kind == "email" else phones.display(value)

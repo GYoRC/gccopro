@@ -45,6 +45,51 @@ def test_unknown_email_gets_same_answer_and_no_mail(client, outbox):
     assert outbox == []
 
 
+def test_login_page_is_identical_when_the_mail_server_is_down(client, monkeypatch):
+    """A send error must not turn into a 500 that only known addresses get."""
+    from gccpro import mail
+
+    def broken(to, subject, body):
+        raise OSError("smtp down")
+
+    monkeypatch.setattr(mail, "send_mail", broken)
+    token = csrf(client)
+    known = client.post("/connexion", data={"identifiant": "alice@test.fr", "csrf_token": token})
+    unknown = client.post("/connexion", data={"identifiant": "x@nowhere.fr", "csrf_token": token})
+    assert known.status_code == unknown.status_code == 200
+    assert "Vérifiez votre messagerie" in known.get_data(as_text=True)
+
+
+def test_login_mail_is_sent_after_the_response(app, client, monkeypatch):
+    """In production the SMTP call runs in a thread, so a slow server cannot slow the answer."""
+    import threading
+    from gccpro import background, mail
+
+    started, release = threading.Event(), threading.Event()
+    sent = []
+
+    def slow_send(to, subject, body):
+        started.set()
+        release.wait(timeout=10)
+        sent.append(to)
+
+    monkeypatch.setattr(mail, "send_mail", slow_send)
+    token = csrf(client)
+    app.config["TESTING"] = False  # use the real background path
+    try:
+        response = client.post("/connexion", data={"identifiant": "alice@test.fr", "csrf_token": token})
+        # The page is already built while the mail is still "being sent".
+        assert response.status_code == 200 and sent == []
+        assert started.wait(timeout=5)
+    finally:
+        release.set()
+        for thread in threading.enumerate():
+            if thread.name == background.THREAD_NAME:
+                thread.join(timeout=5)
+        app.config["TESTING"] = True
+    assert sent == ["alice@test.fr"]
+
+
 def test_expired_link(app, client):
     with app.app_context():
         token = auth.create_login_token(2)
