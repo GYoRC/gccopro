@@ -7,12 +7,15 @@ Sends, at most once each (tracked in ``notification_log``):
 - an email to the administrators for each such unbooked week.
 """
 
+import logging
 from datetime import date, timedelta
 
 from flask import current_app
 
 from . import frdates, mail, push, rules, trash
 from .db import booking_owners, fixed_pickups, get_db, get_resident, get_setting, trash_config
+
+log = logging.getLogger(__name__)
 
 
 def _already_sent(kind: str, resident_id: int, ref: date) -> bool:
@@ -100,11 +103,16 @@ def run(today: date, dry_run: bool = False) -> list[str]:
             channel = "push"
             if delivered == 0:
                 if resident["email"]:
-                    mail.send_mail(
-                        resident["email"],
-                        f"{title} – {site}",
-                        f"Bonjour {resident['name']},\n\n{body}\n\n{base_url}/\n",
-                    )
+                    try:
+                        mail.send_mail(
+                            resident["email"],
+                            f"{title} – {site}",
+                            f"Bonjour {resident['name']},\n\n{body}\n\n{base_url}/\n",
+                        )
+                    except OSError as exc:  # SMTP errors included: keep going, retry next run
+                        log.warning("trash reminder email to %s failed: %s", resident["name"], exc)
+                        report.append(f"trash -> {resident['name']} (email FAILED, not recorded): {exc}")
+                        continue
                     channel = "email"
                 else:
                     # Phone-only resident without notifications enabled: nothing to send.
@@ -137,11 +145,16 @@ def run(today: date, dry_run: bool = False) -> list[str]:
             if dry_run:
                 report.append(f"[dry-run] free week -> admin {admin['name']} (email)")
                 continue
-            mail.send_mail(
-                admin["email"],
-                f"Semaine non réservée – {site}",
-                f"{text}\n\nVous pouvez l’attribuer depuis l’administration : {base_url}/admin\n",
-            )
+            try:
+                mail.send_mail(
+                    admin["email"],
+                    f"Semaine non réservée – {site}",
+                    f"{text}\n\nVous pouvez l’attribuer depuis l’administration : {base_url}/admin\n",
+                )
+            except OSError as exc:  # SMTP errors included: keep going, retry next run
+                log.warning("free-week email to admin %s failed: %s", admin["name"], exc)
+                report.append(f"free week -> admin {admin['name']} (email FAILED, not recorded): {exc}")
+                continue
             _record("free_week_admin", admin["id"], week)
             report.append(f"free week -> admin {admin['name']} (email): {text}")
     return report

@@ -2,6 +2,7 @@
 
 from flask import Blueprint, abort, current_app, g, jsonify, request, send_from_directory, url_for
 
+from .. import push
 from ..auth import login_required
 from ..db import get_db
 
@@ -48,7 +49,10 @@ def subscribe():
     data = request.get_json(silent=True) or {}
     endpoint = data.get("endpoint", "")
     keys = data.get("keys") or {}
-    if not endpoint.startswith("https://") or not keys.get("p256dh") or not keys.get("auth"):
+    if not isinstance(endpoint, str) or not push.endpoint_allowed(endpoint):
+        abort(400)
+    p256dh, auth = keys.get("p256dh"), keys.get("auth")
+    if not isinstance(p256dh, str) or not isinstance(auth, str) or not push.keys_valid(p256dh, auth):
         abort(400)
     db = get_db()
     with db:
@@ -56,7 +60,7 @@ def subscribe():
             "INSERT INTO push_subscriptions (resident_id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)"
             " ON CONFLICT (endpoint) DO UPDATE SET resident_id = excluded.resident_id,"
             " p256dh = excluded.p256dh, auth = excluded.auth",
-            (g.user["id"], endpoint, keys["p256dh"], keys["auth"]),
+            (g.user["id"], endpoint, p256dh, auth),
         )
     return jsonify(ok=True)
 

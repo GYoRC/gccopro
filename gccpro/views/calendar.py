@@ -94,11 +94,17 @@ def month_mondays(year: int, month: int) -> list[date]:
     return mondays
 
 
+#: Years the calendar accepts from the query string; anything else falls back to today.
+MIN_YEAR, MAX_YEAR = 2000, 2100
+
+
 def parse_month(value: str | None, today: date) -> tuple[int, int]:
     """Parse ``YYYY-MM`` from the query string; fall back to today's month."""
     try:
         year, month = (int(part) for part in (value or "").split("-"))
-        date(year, month, 1)  # validates the range
+        date(year, month, 1)  # validates the month
+        if not MIN_YEAR <= year <= MAX_YEAR:
+            raise ValueError(year)
         return year, month
     except ValueError:
         return today.year, today.month
@@ -143,7 +149,8 @@ def parse_year(value: str | None, today: date) -> int:
     """Parse the ``annee`` query parameter; fall back to today's year."""
     try:
         year = int(value or "")
-        date(year, 1, 1)  # validates the range
+        if not MIN_YEAR <= year <= MAX_YEAR:
+            raise ValueError(year)
         return year
     except ValueError:
         return today.year

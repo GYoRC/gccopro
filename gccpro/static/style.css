@@ -238,10 +238,10 @@ tr.free td:first-child { font-weight: 600; }
 details.help { margin-top: 1rem; color: var(--muted); }
 
 /* Year view: twelve mini-months, one thin row per week. */
-.year { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); }
+.year { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
 .mini h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
 .mini h3 a { text-decoration: none; }
-.mini-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 2px; padding: 1px 2px; border-radius: 6px; font-size: 0.7rem; text-align: center; }
+.mini-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 3px; padding: 0.4rem 2px; border-radius: 6px; font-size: 0.8rem; text-align: center; }
 .mini-week .day { display: block; min-height: 0; }
 .mini-week .day.out { visibility: hidden; }
 .mini-week .day.today { background: var(--accent); color: var(--accent-text); border-radius: 999px; }

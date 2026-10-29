@@ -17,7 +17,7 @@ import urllib.request
 from urllib.parse import urlsplit
 
 import certifi
-from ecdsa import ECDH, NIST256p, SigningKey
+from ecdsa import ECDH, NIST256p, SigningKey, VerifyingKey
 from ecdsa.util import sigencode_string
 from flask import current_app
 
@@ -30,6 +30,14 @@ log = logging.getLogger(__name__)
 RECORD_SIZE = 4096
 #: How long push services keep an undelivered message, in seconds.
 TTL = 12 * 3600
+#: Host suffixes of the browser push services. A subscription endpoint is a URL the
+#: server will POST to, so anything else (e.g. a LAN address) is refused.
+PUSH_HOST_SUFFIXES = (
+    ".googleapis.com",             # Chrome / Android (FCM)
+    ".push.services.mozilla.com",  # Firefox
+    ".notify.windows.com",         # Edge / Windows
+    ".push.apple.com",             # Safari / iOS
+)
 
 
 def b64url_encode(data: bytes) -> str:
@@ -40,6 +48,32 @@ def b64url_encode(data: bytes) -> str:
 def b64url_decode(text: str) -> bytes:
     """Decode base64url, tolerating missing padding."""
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def endpoint_allowed(endpoint: str) -> bool:
+    """Return True if ``endpoint`` is an https URL on a known push service host."""
+    try:
+        parts = urlsplit(endpoint)
+        host = (parts.hostname or "").lower()
+    except ValueError:
+        return False
+    return parts.scheme == "https" and host.endswith(PUSH_HOST_SUFFIXES)
+
+
+def keys_valid(p256dh: str, auth: str) -> bool:
+    """Return True if the browser keys can be used: a P-256 point and a 16-byte secret."""
+    try:
+        VerifyingKey.from_string(b64url_decode(p256dh), curve=NIST256p)
+        return len(b64url_decode(auth)) == 16
+    except Exception:  # bad base64, wrong length or a point not on the curve
+        return False
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects: a push service never needs one, and following could reach internal hosts."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
 
 
 def _hmac_sha256(key: bytes, data: bytes) -> bytes:
@@ -143,6 +177,8 @@ def deliver(subscription: dict, message: dict) -> int:
         The HTTP status code (201 on success; 404/410 mean the subscription is gone).
     """
     cfg = current_app.config
+    if not endpoint_allowed(subscription["endpoint"]):
+        raise ValueError("push endpoint is not a known push service")
     body = encrypt(
         json.dumps(message, ensure_ascii=False).encode("utf-8"),
         b64url_decode(subscription["p256dh"]),
@@ -164,7 +200,8 @@ def deliver(subscription: dict, message: dict) -> int:
     )
     context = ssl.create_default_context(cafile=certifi.where())
     try:
-        with urllib.request.urlopen(request, timeout=15, context=context) as response:
+        opener = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPSHandler(context=context))
+        with opener.open(request, timeout=15) as response:
             return response.status
     except urllib.error.HTTPError as exc:
         return exc.code
@@ -174,7 +211,8 @@ def send_to_resident(resident_id: int, title: str, body: str, url: str = "/") ->
     """Send a notification to every device a resident subscribed.
 
     Subscriptions the push service reports as expired (404/410) are deleted.
-    Network errors are logged and count as failures.
+    Any error on one subscription (network, bad key, refused endpoint) is logged and
+    counts as a failure; the remaining subscriptions are still tried.
 
     Returns:
         The number of devices that accepted the message.
@@ -189,7 +227,7 @@ def send_to_resident(resident_id: int, title: str, body: str, url: str = "/") ->
     for sub in subs:
         try:
             status = deliver(dict(sub), message)
-        except (OSError, ValueError) as exc:
+        except Exception as exc:  # one broken subscription must not stop the others
             log.warning("push to subscription %s failed: %s", sub["id"], exc)
             continue
         if status in (404, 410):

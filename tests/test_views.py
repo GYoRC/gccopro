@@ -151,9 +151,33 @@ def test_deactivated_resident_is_logged_out(client, app, outbox):
     assert client.get("/").status_code == 302
 
 
+def valid_subscription(endpoint: str = "https://fcm.googleapis.com/fcm/send/abc") -> dict:
+    """Return a subscription like a browser would send: a real P-256 key and a 16-byte secret."""
+    from ecdsa import NIST256p, SigningKey
+    from gccpro.push import b64url_encode
+    point = SigningKey.generate(curve=NIST256p).verifying_key.to_string("uncompressed")
+    return {"endpoint": endpoint, "keys": {"p256dh": b64url_encode(point), "auth": b64url_encode(b"0123456789abcdef")}}
+
+
+def test_push_subscription_rejects_bad_input(client, app, outbox):
+    login(client, outbox, "alice@test.fr")
+    headers = {"X-CSRF-Token": csrf(client)}
+    good = valid_subscription()
+    # An off-curve key, a short secret, and endpoints that are not push services.
+    bad_key = {**good, "keys": {**good["keys"], "p256dh": "AAAA"}}
+    bad_auth = {**good, "keys": {**good["keys"], "auth": "AAAA"}}
+    lan = valid_subscription("https://192.168.1.49:5001/x")
+    plain = valid_subscription("http://fcm.googleapis.com/x")
+    lookalike = valid_subscription("https://fcm.googleapis.com.evil.example/x")
+    for sub in (bad_key, bad_auth, lan, plain, lookalike, {"endpoint": 5, "keys": {}}):
+        assert client.post("/push/abonnement", json=sub, headers=headers).status_code == 400
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0] == 0
+
+
 def test_push_subscription_roundtrip(client, app, outbox):
     login(client, outbox, "alice@test.fr")
-    sub = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "x", "auth": "y"}}
+    sub = valid_subscription()
     response = client.post("/push/abonnement", json=sub, headers={"X-CSRF-Token": csrf(client)})
     assert response.status_code == 200
     with app.app_context():
@@ -197,6 +221,10 @@ def test_month_view_select_and_book(client, outbox):
 def test_month_view_tolerates_bad_parameters(client, outbox):
     login(client, outbox, "alice@test.fr")
     assert client.get("/?mois=2026-13&semaine=nope").status_code == 200
+    # Out-of-range years fall back to today instead of crashing.
+    for query in ("mois=9999-12", "mois=0001-01", "vue=annee&annee=9999", "vue=annee&annee=1"):
+        page = client.get("/?" + query)
+        assert page.status_code == 200, query
     assert client.get("/?vue=liste").status_code == 200
 
 

@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "data@anthropic-plugin-directory": true
+  }
+}

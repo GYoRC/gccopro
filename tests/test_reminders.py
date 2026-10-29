@@ -138,3 +138,51 @@ def test_expired_subscription_is_removed(app, monkeypatch):
         assert push.send_to_resident(2, "t", "b") == 0
         assert get_db().execute(
             "SELECT COUNT(*) FROM push_subscriptions WHERE resident_id = 2").fetchone()[0] == 0
+
+
+def test_failed_email_does_not_stop_the_run(app, sent, monkeypatch):
+    """A failing SMTP send is reported and retried next run; the others still go out."""
+    from gccpro import mail
+    setup_db(app, subscribe=())  # nobody has push, so trash reminders go by email
+    attempts = []
+
+    def flaky_send(to, subject, body):
+        attempts.append(to)
+        if len(attempts) == 1:
+            raise OSError("smtp down")
+
+    monkeypatch.setattr(mail, "send_mail", flaky_send)
+    with app.app_context():
+        report = reminders.run(date(2026, 10, 19))  # Monday: Tuesday pickup, Alice on duty
+        again = reminders.run(date(2026, 10, 19))
+    assert any("FAILED" in line for line in report)
+    # The failed recipient was not recorded, so the second run tries them again and succeeds.
+    assert len(attempts) > 1 and not any("FAILED" in line for line in again)
+
+
+def test_send_to_resident_survives_a_broken_subscription(app, monkeypatch):
+    """A bad row (bad key, refused endpoint) is skipped; later subscriptions are still tried."""
+    setup_db(app, subscribe=())
+    with app.app_context():
+        db = get_db()
+        with db:
+            for n in (1, 2):
+                db.execute("INSERT INTO push_subscriptions (resident_id, endpoint, p256dh, auth)"
+                           " VALUES (2, ?, 'k', 'a')", (f"https://fcm.googleapis.com/{n}",))
+        calls = []
+
+        def deliver(subscription, message):
+            calls.append(subscription["endpoint"])
+            if len(calls) == 1:
+                raise AssertionError("bad point")  # what a malformed key raises inside ecdsa
+            return 201
+
+        monkeypatch.setattr(push, "deliver", deliver)
+        assert push.send_to_resident(2, "t", "b") == 1
+    assert len(calls) == 2
+
+
+def test_deliver_refuses_unknown_hosts(app):
+    with app.app_context():
+        with pytest.raises(ValueError):
+            push.deliver({"endpoint": "https://192.168.1.49/x", "p256dh": "k", "auth": "a"}, {})
