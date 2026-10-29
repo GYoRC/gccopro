@@ -3,6 +3,19 @@
     Each month row is one Monday–Sunday week; tapping it selects the week (?semaine=)
     and shows its details and actions in the panel below the grid. -#}
 
+{#- Spoken name of a week link. An aria-label replaces the link's content for screen readers,
+    so it must carry what the eye gets from colours and icons: who is on duty, the status,
+    and whether there is a pickup or an event. -#}
+{% macro week_label(w) -%}
+Semaine {{ w.monday | semaine }}
+{%- if w.current %}, semaine en cours{% endif %}, {% if w.mine %}vous êtes inscrit(e)
+{%- elif w.booking %}inscrit : {{ w.booking.name }}
+{%- elif w.past %}passée, personne n’était inscrit
+{%- else %}libre{% endif %}
+{%- if w.pickups %}, collecte des poubelles{% endif %}
+{%- if w.events %}, événement{% endif %}
+{%- endmacro %}
+
 {% macro month_grid(cal, today) %}
 <section class="month" aria-label="Calendrier de {{ cal.label }}">
   <div class="month-nav">
@@ -16,7 +29,7 @@
   {%- set pickup_days = w.pickups | map(attribute='date') | list -%}
   <a class="mweek {{ status }}{% if cal.selected and cal.selected.monday == w.monday %} selected{% endif %}{% if w.current %} current{% endif %}"
      href="{{ url_for('calendar.index', mois=cal.month, semaine=w.monday.isoformat()) }}#semaine-choisie"
-     aria-label="Semaine {{ w.monday | semaine }}">
+     aria-label="{{ week_label(w) }}">
     <span class="days">
       {%- for d in w.days %}
       <span class="day{% if d.month != cal.year_month[1] %} out{% endif %}{% if d == today %} today{% endif %}">
@@ -53,7 +66,7 @@
       {%- set status = 'past' if w.past else ('mine' if w.mine else ('taken' if w.booking else 'free')) -%}
       <a class="mweek mini-week {{ status }}{% if w.current %} current{% endif %}"
          href="{{ url_for('calendar.index', mois=m.key, semaine=w.monday.isoformat()) }}#semaine-choisie"
-         aria-label="Semaine {{ w.monday | semaine }}">
+         aria-label="{{ week_label(w) }}">
         {%- for d in w.days %}<span class="day{% if d.month != m.number %} out{% endif %}{% if d == today %} today{% endif %}">{{ d.day }}</span>{% endfor -%}
       </a>
       {% endfor %}

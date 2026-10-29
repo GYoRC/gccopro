@@ -273,6 +273,27 @@ def test_month_view_tolerates_bad_parameters(client, outbox):
     assert client.get("/?vue=liste").status_code == 200
 
 
+def test_week_links_are_described_for_screen_readers(client, app, outbox):
+    """The aria-label replaces the link text, so it must say who is on duty and the status."""
+    with app.app_context():
+        db = get_db()
+        with db:
+            db.execute("INSERT INTO bookings (week_start, resident_id) VALUES (?, 3)", (NEXT_MONDAY,))
+            db.execute("INSERT INTO trash_rules (label, weekday, frequency) VALUES ('Ordures', 1, 'weekly')")
+    login(client, outbox, "alice@test.fr")
+    book(client, "2026-11-09")
+    for url in ("/?mois=2026-11", "/?vue=annee"):
+        page = client.get(url).get_data(as_text=True)
+        # Alice's own week, a neighbour's week (with a pickup), a free week, and the current week.
+        assert 'aria-label="Semaine du 9 au 15 novembre 2026, vous êtes inscrit(e), collecte des poubelles"' in page
+        assert 'aria-label="Semaine du 26 octobre au 1er novembre 2026, inscrit : Bruno, collecte des poubelles"' in page
+        assert 'aria-label="Semaine du 2 au 8 novembre 2026, libre, collecte des poubelles"' in page
+
+    # The current week (19 October) only appears in the October month view and in the year view.
+    for url in ("/?mois=2026-10", "/?vue=annee"):
+        assert "Semaine du 19 au 25 octobre 2026, semaine en cours, libre" in client.get(url).get_data(as_text=True)
+
+
 def test_year_view(client, outbox):
     login(client, outbox, "alice@test.fr")
     book(client, NEXT_MONDAY)
