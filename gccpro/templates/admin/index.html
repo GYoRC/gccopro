@@ -6,7 +6,7 @@
 {% endmacro %}
 {% block content %}
 <h1>Administration</h1>
-<nav class="tabs">
+<nav class="tabs" aria-label="Sections de l’administration">
   <a href="#residents">Résidents</a> <a href="#semaines">Semaines</a> <a href="#poubelles">Poubelles</a>
   <a href="#annonces">Annonces</a> <a href="#reglages">Réglages</a>
 </nav>
@@ -100,7 +100,7 @@
           <form method="post" action="{{ url_for('admin.assign_week') }}" class="inline-form">
             {{ csrf('semaines') }}
             <input type="hidden" name="week_start" value="{{ w.monday.isoformat() }}">
-            <select name="resident_id" aria-label="Résident">
+            <select name="resident_id" aria-label="Résident pour la semaine {{ w.monday | semaine }}">
               <option value="">—</option>
               {% for r in residents if r.active %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}
             </select>

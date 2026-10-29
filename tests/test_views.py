@@ -174,6 +174,39 @@ def test_admin_adds_resident_and_sends_link(client, outbox):
     assert outbox[-1]["To"] == "chloe@test.fr"
 
 
+def test_admin_text_length_is_capped(client, app, outbox):
+    login(client, outbox, "admin@test.fr")
+    token = csrf(client)
+    page = client.post("/admin/annonces/ajouter", data={"title": "x" * 201, "csrf_token": token},
+                       follow_redirects=True).get_data(as_text=True)
+    assert "trop long" in page
+    page = client.post("/admin/poubelles/ajouter", data={"label": "y" * 201, "weekday": 1, "frequency": "weekly",
+                                                        "csrf_token": token}, follow_redirects=True).get_data(as_text=True)
+    assert "trop long" in page
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM announcements").fetchone()[0] == 0
+        assert get_db().execute("SELECT COUNT(*) FROM trash_rules").fetchone()[0] == 0
+
+
+def test_phone_only_resident_gets_a_whatsapp_hint(client, outbox):
+    login(client, outbox, "admin@test.fr")
+    page = client.post("/admin/residents/ajouter", data={"name": "Eva", "phone": "06 12 34 56 78", "apartment": "Apt 4",
+                                                        "send_link": "1", "csrf_token": csrf(client)},
+                       follow_redirects=True).get_data(as_text=True)
+    assert "Lien WhatsApp" in page and "ajouté(e)" in page
+
+
+def test_error_pages(client, outbox):
+    login(client, outbox, "alice@test.fr")
+    forbidden = client.get("/admin")
+    assert forbidden.status_code == 403
+    assert "réservée à l’administrateur" not in forbidden.get_data(as_text=True)
+    # Failed actions are announced to assistive technology as alerts.
+    page = client.post("/reserver", data={"week_start": "2026-10-12", "count": 1, "csrf_token": csrf(client)},
+                       follow_redirects=True).get_data(as_text=True)
+    assert 'class="flash erreur" role="alert"' in page
+
+
 def test_apartment_must_come_from_fixed_list(client, app, outbox):
     login(client, outbox, "admin@test.fr")
     client.post("/admin/residents/ajouter", data={"name": "Dan", "email": "dan@test.fr",

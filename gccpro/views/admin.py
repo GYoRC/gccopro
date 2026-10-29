@@ -12,6 +12,9 @@ from . import parse_date
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
+#: Longest titles / labels and announcement bodies the admin forms accept.
+MAX_TEXT, MAX_BODY = 200, 5000
+
 #: Bounds for each editable setting, and its French label on the page.
 SETTING_FIELDS = {
     "horizon_weeks": (4, 104, "Réservations ouvertes sur (semaines)"),
@@ -119,6 +122,8 @@ def add_resident():
         return _back()
     if request.form.get("send_link") and auth.send_login_link(get_resident(cur.lastrowid)):
         flash(f"{name} ajouté(e) ; un lien de connexion a été envoyé par e-mail.", "ok")
+    elif request.form.get("send_link"):
+        flash(f"{name} ajouté(e). Pas d’adresse e-mail : utilisez le bouton « Lien WhatsApp ».", "ok")
     else:
         flash(f"{name} ajouté(e).", "ok")
     return _back()
@@ -287,6 +292,9 @@ def free_week():
 def add_trash_rule():
     """Add a recurring pickup (label, weekday, frequency)."""
     label = request.form.get("label", "").strip()
+    if len(label) > MAX_TEXT:
+        flash(f"Le libellé est trop long ({MAX_TEXT} caractères au maximum).", "erreur")
+        return _back()
     weekday = request.form.get("weekday", type=int)
     frequency = request.form.get("frequency", "weekly")
     if not label or weekday not in range(7) or frequency not in trash.FREQUENCIES:
@@ -316,6 +324,9 @@ def delete_trash_rule(rule_id: int):
 def add_trash_date():
     """Add a one-off pickup on a fixed date (e.g. green waste)."""
     label = request.form.get("label", "").strip()
+    if len(label) > MAX_TEXT:
+        flash(f"Le libellé est trop long ({MAX_TEXT} caractères au maximum).", "erreur")
+        return _back()
     day = parse_date(request.form.get("date"))
     if not label:
         flash("Collecte invalide.", "erreur")
@@ -388,6 +399,9 @@ def add_announcement():
     title = request.form.get("title", "").strip()
     if not title:
         flash("Le titre est obligatoire.", "erreur")
+        return _back()
+    if len(title) > MAX_TEXT or len(request.form.get("body", "")) > MAX_BODY:
+        flash(f"Texte trop long (titre : {MAX_TEXT} caractères, texte : {MAX_BODY} au maximum).", "erreur")
         return _back()
     event_raw = request.form.get("event_date", "").strip()
     event_date = parse_date(event_raw) if event_raw else None

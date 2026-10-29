@@ -4,7 +4,7 @@
 <section class="card narrow">
   {% if error.code == 403 %}
     <h1>Accès refusé</h1>
-    <p>Cette page est réservée à l’administrateur.</p>
+    <p>Vous n’avez pas le droit d’ouvrir cette page ou d’effectuer cette action.</p>
   {% elif error.code == 404 %}
     <h1>Page introuvable</h1>
     <p>Cette page n’existe pas ou plus.</p>
